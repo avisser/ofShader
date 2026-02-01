@@ -31,8 +31,9 @@ private:
     void startCamera(int index);
     void resetBackgroundSubtractor();
     void updateComposite();
-    void drawTextureCover(ofTexture &tex, float dstW, float dstH);
+    void drawTextureCover(ofTexture &tex, float dstW, float dstH, bool mirrorX);
     void printSettings();
+    void setupKeyShader();
 
     AppConfig config;
 
@@ -54,4 +55,14 @@ private:
     ofPixels rgbaPixels;
     ofTexture rgbaTexture;
     bool compositeReady = false;
+
+    ofShader keyShader;
+    bool shaderReady = false;
+    bool useShaderKey = true;
+    float keyHueDeg = 120.0f;
+    float keyHueRangeDeg = 20.0f;
+    float keyMinSat = 0.25f;
+    float keyMinVal = 0.2f;
+    float posterizeLevels = 6.0f;
+    float edgeStrength = 1.1f;
 };
