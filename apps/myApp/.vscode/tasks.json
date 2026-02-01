@@ -1,0 +1,35 @@
+{
+  "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "appArgs",
+      "type": "promptString",
+      "description": "Command line args (optional)",
+      "default": ""
+    }
+  ],
+  "tasks": [
+    {
+      "label": "Build (xcodebuild)",
+      "type": "shell",
+      "command": "if [ -d \"${workspaceFolder}/myApp.xcodeproj\" ]; then xcodebuild -project \"${workspaceFolder}/myApp.xcodeproj\" -target myApp -configuration Debug build; else echo \"Missing myApp.xcodeproj. Run the openFrameworks Project Generator first.\"; exit 1; fi",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": "$gcc",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      }
+    },
+    {
+      "label": "Run (Debug)",
+      "type": "shell",
+      "dependsOn": "Build (xcodebuild)",
+      "command": "if [ -x \"${workspaceFolder}/bin/myAppDebug.app/Contents/MacOS/myAppDebug\" ]; then \"${workspaceFolder}/bin/myAppDebug.app/Contents/MacOS/myAppDebug\" ${input:appArgs}; else echo \"Missing app bundle. Run the build task first.\"; exit 1; fi",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      }
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor/IDE
+.idea/
+*.iml
+
+# Xcode
+DerivedData/
+*.xcuserstate
+*.xcuserdata/
+*.xcworkspace/
+*.xcscmblueprint
+*.xccheckout
+
+# openFrameworks build outputs
+apps/myApp/bin/
+apps/myApp/build/
+
+# Generated project files (regenerate with Project Generator)
+apps/myApp/*.xcodeproj/
