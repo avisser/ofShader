@@ -3,6 +3,8 @@
 #include <opencv2/imgproc.hpp>
 
 #include <algorithm>
+#include <array>
+#include <cmath>
 
 ofApp::ofApp(const AppConfig &config)
 : config(config) {}
@@ -56,6 +58,25 @@ uniform float keyMinSat;
 uniform float keyMinVal;
 uniform float levels;
 uniform float edgeStrength;
+uniform float time;
+uniform float bpm;
+uniform float pulseAmount;
+uniform float pulseColorize;
+uniform float pulseHueMode;
+uniform float pulseHueShift;
+uniform float pulseAttack;
+uniform float pulseDecay;
+uniform float pulseHueBoost;
+uniform float wooferOn;
+uniform float wooferStrength;
+uniform float wooferFalloff;
+uniform float kaleidoOn;
+uniform float kaleidoSegments;
+uniform float kaleidoSpin;
+uniform vec2 texSize;
+uniform float halftoneOn;
+uniform float halftoneScale;
+uniform float halftoneEdge;
 
 in vec2 vTexCoord;
 out vec4 outputColor;
@@ -71,12 +92,65 @@ vec3 rgb2hsv(vec3 c) {
                 q.x);
 }
 
+vec3 hsv2rgb(vec3 c) {
+    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
 float luma(vec3 c) {
     return dot(c, vec3(0.299, 0.587, 0.114));
 }
 
 void main() {
-    vec3 rgb = texture(tex0, vTexCoord).rgb;
+    float phase = fract(time * (bpm / 60.0));
+    float attack = max(0.001, pulseAttack);
+    float decay = max(0.001, pulseDecay);
+    float ramp = smoothstep(0.0, attack, phase);
+    float fall = (phase <= attack) ? 1.0 : exp(-(phase - attack) * decay);
+    float kick = ramp * fall;
+    float boostedKick = min(1.0, kick * pulseHueBoost);
+    float pulse = 1.0 + (pulseAmount * boostedKick);
+
+    vec2 coord = vTexCoord;
+    if (kaleidoOn > 0.5) {
+        vec2 center = texSize * 0.5;
+        vec2 p = coord - center;
+        float r = length(p);
+        float angle = atan(p.y, p.x) + kaleidoSpin * time;
+        float segments = max(1.0, kaleidoSegments);
+        float sector = 6.2831853 / segments;
+        angle = mod(angle, sector);
+        angle = abs(angle - sector * 0.5);
+        vec2 newP = vec2(cos(angle), sin(angle)) * r;
+        coord = newP + center;
+    }
+
+    if (wooferOn > 0.5) {
+        vec2 center = texSize * 0.5;
+        vec2 p = coord - center;
+        float maxR = max(1.0, min(texSize.x, texSize.y) * 0.5);
+        float rNorm = length(p) / maxR;
+        float falloff = pow(clamp(1.0 - rNorm, 0.0, 1.0), wooferFalloff);
+        float bulge = 1.0 + (wooferStrength * boostedKick * falloff);
+        coord = center + (p * bulge);
+    }
+
+    coord = clamp(coord, vec2(0.0), texSize - 1.0);
+
+    vec3 rgb = texture(tex0, coord).rgb;
+    float dotMask = 1.0;
+    if (halftoneOn > 0.5) {
+        float cell = max(2.0, halftoneScale);
+        vec2 cellSize = vec2(cell);
+        vec2 cellCenter = (floor(coord / cellSize) + 0.5) * cellSize;
+        vec2 offset = coord - cellCenter;
+        float lum = luma(rgb);
+        float radius = (1.0 - lum) * 0.5 * cell;
+        float edge = max(0.001, radius * halftoneEdge);
+        float dist = length(offset);
+        dotMask = 1.0 - smoothstep(radius - edge, radius + edge, dist);
+    }
     vec3 hsv = rgb2hsv(rgb);
 
     float hueDist = abs(hsv.x - keyHue);
@@ -93,15 +167,28 @@ void main() {
     vec3 poster = floor(rgb * safeLevels) / (safeLevels - 1.0);
 
     float lumC = luma(rgb);
-    float lumR = luma(texture(tex0, vTexCoord + vec2(1.0, 0.0)).rgb);
-    float lumU = luma(texture(tex0, vTexCoord + vec2(0.0, 1.0)).rgb);
+    float lumR = luma(texture(tex0, coord + vec2(1.0, 0.0)).rgb);
+    float lumU = luma(texture(tex0, coord + vec2(0.0, 1.0)).rgb);
     float edge = abs(lumC - lumR) + abs(lumC - lumU);
 
     vec3 color = mix(rgb, poster, 0.85);
     color += edgeStrength * edge;
+    color *= pulse;
+    color = mix(color, color * vec3(1.1, 0.85, 1.2), pulseColorize * boostedKick);
+    if (abs(pulseHueMode) > 0.5) {
+        vec3 hsvOut = rgb2hsv(color);
+        float shift = (pulseHueShift / 360.0) * boostedKick;
+        if (pulseHueMode > 0.0) {
+            hsvOut.x = fract(hsvOut.x - shift);
+        } else {
+            hsvOut.x = fract(hsvOut.x + shift);
+        }
+        color = hsv2rgb(hsvOut);
+    }
     color = clamp(color, 0.0, 1.0);
 
-    outputColor = vec4(color * alpha, alpha);
+    color *= dotMask;
+    outputColor = vec4(color * alpha, alpha * dotMask);
 }
 )";
 
@@ -120,10 +207,13 @@ void main() {
 void ofApp::update() {
     grabber.update();
     if (grabber.isFrameNew()) {
+        updateMotion(grabber.getPixels());
         if (!useShaderKey) {
             updateComposite();
         }
     }
+
+    updateTrail(ofGetLastFrameTime());
 }
 
 void ofApp::draw() {
@@ -142,20 +232,46 @@ void ofApp::draw() {
     if (useShaderKey && shaderReady && grabber.isInitialized() && grabber.getTexture().isAllocated()) {
         keyShader.begin();
         keyShader.setUniformTexture("tex0", grabber.getTexture(), 0);
+        keyShader.setUniform2f("texSize", grabber.getWidth(), grabber.getHeight());
         keyShader.setUniform1f("keyHue", keyHueDeg / 360.0f);
         keyShader.setUniform1f("keyHueRange", keyHueRangeDeg / 360.0f);
         keyShader.setUniform1f("keyMinSat", keyMinSat);
         keyShader.setUniform1f("keyMinVal", keyMinVal);
         keyShader.setUniform1f("levels", posterizeLevels);
         keyShader.setUniform1f("edgeStrength", edgeStrength);
+        keyShader.setUniform1f("time", ofGetElapsedTimef());
+        keyShader.setUniform1f("bpm", pulseBpm);
+        keyShader.setUniform1f("pulseAmount", pulseAmount);
+        keyShader.setUniform1f("pulseColorize", pulseColorize);
+        keyShader.setUniform1f("pulseHueMode", static_cast<float>(pulseHueMode));
+        keyShader.setUniform1f("pulseHueShift", pulseHueShiftDeg);
+        keyShader.setUniform1f("pulseAttack", pulseAttack);
+        keyShader.setUniform1f("pulseDecay", pulseDecay);
+        keyShader.setUniform1f("pulseHueBoost", pulseHueBoost);
+        keyShader.setUniform1f("wooferOn", enableWoofer ? 1.0f : 0.0f);
+        keyShader.setUniform1f("wooferStrength", wooferStrength);
+        keyShader.setUniform1f("wooferFalloff", wooferFalloff);
+        keyShader.setUniform1f("kaleidoOn", enableKaleido ? 1.0f : 0.0f);
+        keyShader.setUniform1f("kaleidoSegments", kaleidoSegments);
+        keyShader.setUniform1f("kaleidoSpin", kaleidoSpin);
+        keyShader.setUniform1f("halftoneOn", enableHalftone ? 1.0f : 0.0f);
+        keyShader.setUniform1f("halftoneScale", halftoneScale);
+        keyShader.setUniform1f("halftoneEdge", halftoneEdge);
         drawTextureCover(grabber.getTexture(), ofGetWidth(), ofGetHeight(), true);
         keyShader.end();
     } else if (compositeReady) {
         drawTextureCover(rgbaTexture, ofGetWidth(), ofGetHeight(), true);
     }
+
+    if (enableTrail) {
+        drawTrail();
+    }
 }
 
 void ofApp::keyPressed(int key) {
+    static const std::array<float, 6> kKaleidoModes = {0.0f, 4.0f, 6.0f, 8.0f, 10.0f, 12.0f};
+    static const std::array<float, 4> kHalftoneModes = {0.0f, 10.0f, 14.0f, 22.0f};
+    static const std::array<int, 3> kWooferModes = {0, 1, 1};
     if (key == 'f') {
         ofToggleFullscreen();
     } else if (key == 'r') {
@@ -168,6 +284,28 @@ void ofApp::keyPressed(int key) {
         useShaderKey = false;
         resetBackgroundSubtractor();
         printSettings();
+    } else if (key == 'k') {
+        kaleidoModeIndex = (kaleidoModeIndex + 1) % static_cast<int>(kKaleidoModes.size());
+        kaleidoSegments = kKaleidoModes[static_cast<size_t>(kaleidoModeIndex)];
+        enableKaleido = kaleidoSegments > 0.5f;
+        printSettings();
+    } else if (key == 'c') {
+        enableTrail = !enableTrail;
+        hasTrailPos = false;
+        if (!enableTrail && trailFbo.isAllocated()) {
+            trailFbo.begin();
+            ofClear(0, 0, 0, 0);
+            trailFbo.end();
+        }
+        printSettings();
+    } else if (key == 'd') {
+        halftoneModeIndex = (halftoneModeIndex + 1) % static_cast<int>(kHalftoneModes.size());
+        float nextScale = kHalftoneModes[static_cast<size_t>(halftoneModeIndex)];
+        enableHalftone = nextScale > 0.5f;
+        if (enableHalftone) {
+            halftoneScale = nextScale;
+        }
+        printSettings();
     } else if (key == '+') {
         maskThreshold = std::min(255, maskThreshold + 5);
         printSettings();
@@ -178,7 +316,8 @@ void ofApp::keyPressed(int key) {
         enableMorph = !enableMorph;
         printSettings();
     } else if (key == 'b') {
-        enableBlur = !enableBlur;
+        wooferModeIndex = (wooferModeIndex + 1) % static_cast<int>(kWooferModes.size());
+        enableWoofer = kWooferModes[static_cast<size_t>(wooferModeIndex)] != 0;
         printSettings();
     } else if (key == 's') {
         detectShadows = !detectShadows;
@@ -367,6 +506,154 @@ void ofApp::drawTextureCover(ofTexture &tex, float dstW, float dstH, bool mirror
     }
 }
 
+void ofApp::updateMotion(const ofPixels &camPixels) {
+    if (!camPixels.isAllocated()) {
+        return;
+    }
+
+    cv::Mat frame;
+    cv::Mat frameConverted;
+    if (camPixels.getNumChannels() == 3) {
+        frame = cv::Mat(camPixels.getHeight(),
+                        camPixels.getWidth(),
+                        CV_8UC3,
+                        const_cast<unsigned char *>(camPixels.getData()),
+                        camPixels.getBytesStride());
+    } else if (camPixels.getNumChannels() == 4) {
+        cv::Mat rgba(camPixels.getHeight(),
+                     camPixels.getWidth(),
+                     CV_8UC4,
+                     const_cast<unsigned char *>(camPixels.getData()),
+                     camPixels.getBytesStride());
+        cv::cvtColor(rgba, frameConverted, cv::COLOR_RGBA2RGB);
+        frame = frameConverted;
+    } else {
+        return;
+    }
+
+    cv::Mat gray;
+    cv::cvtColor(frame, gray, cv::COLOR_RGB2GRAY);
+
+    if (prevGray.empty() || prevGray.size() != gray.size()) {
+        motionCamW = static_cast<float>(gray.cols);
+        motionCamH = static_cast<float>(gray.rows);
+        prevGray = gray.clone();
+        motionLevel = 0.0f;
+        motionCenter = {gray.cols * 0.5f, gray.rows * 0.5f};
+        int px = ofClamp(static_cast<int>(motionCenter.x), 0, camPixels.getWidth() - 1);
+        int py = ofClamp(static_cast<int>(motionCenter.y), 0, camPixels.getHeight() - 1);
+        ofColor sample = camPixels.getColor(px, py);
+        float hue = sample.getHue() / 255.0f;
+        float sat = ofClamp((sample.getSaturation() / 255.0f) * 1.2f, 0.6f, 1.0f);
+        float bri = ofClamp((sample.getBrightness() / 255.0f) * 1.2f, 0.6f, 1.0f);
+        motionColor = ofFloatColor::fromHsb(hue, sat, bri, 1.0f);
+        return;
+    }
+
+    cv::Mat diff;
+    cv::absdiff(gray, prevGray, diff);
+    cv::Scalar meanDiff = cv::mean(diff);
+    motionLevel = static_cast<float>(meanDiff[0] / 255.0);
+
+    cv::Mat thresh;
+    cv::threshold(diff, thresh, 25, 255, cv::THRESH_BINARY);
+    cv::Moments m = cv::moments(thresh, true);
+    if (m.m00 > 0.0) {
+        motionCenter = {static_cast<float>(m.m10 / m.m00),
+                        static_cast<float>(m.m01 / m.m00)};
+    }
+
+    motionCamW = static_cast<float>(gray.cols);
+    motionCamH = static_cast<float>(gray.rows);
+
+    int px = ofClamp(static_cast<int>(motionCenter.x), 0, camPixels.getWidth() - 1);
+    int py = ofClamp(static_cast<int>(motionCenter.y), 0, camPixels.getHeight() - 1);
+    ofColor sample = camPixels.getColor(px, py);
+    float hue = sample.getHue() / 255.0f;
+    float sat = ofClamp((sample.getSaturation() / 255.0f) * 1.2f, 0.6f, 1.0f);
+    float bri = ofClamp((sample.getBrightness() / 255.0f) * 1.2f, 0.6f, 1.0f);
+    motionColor = ofFloatColor::fromHsb(hue, sat, bri, 1.0f);
+
+    prevGray = gray.clone();
+}
+
+void ofApp::updateTrail(float dt) {
+    if (!enableTrail) {
+        return;
+    }
+
+    int width = ofGetWidth();
+    int height = ofGetHeight();
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+
+    if (!trailFbo.isAllocated() ||
+        static_cast<int>(trailFbo.getWidth()) != width ||
+        static_cast<int>(trailFbo.getHeight()) != height) {
+        trailFbo.allocate(width, height, GL_RGBA);
+        trailFbo.begin();
+        ofClear(0, 0, 0, 0);
+        trailFbo.end();
+    }
+
+    trailFbo.begin();
+    ofPushStyle();
+    ofEnableBlendMode(OF_BLENDMODE_ALPHA);
+    ofSetColor(0, 0, 0, static_cast<int>(trailFade * 255.0f));
+    ofDrawRectangle(0, 0, width, height);
+
+    if (motionLevel > motionThreshold && motionCamW > 0.0f && motionCamH > 0.0f) {
+        float intensity = ofClamp((motionLevel - motionThreshold) * 12.0f, 0.0f, 1.0f);
+        ofVec2f pos = mapCameraToScreen(motionCenter, motionCamW, motionCamH, true);
+        ofFloatColor c = motionColor;
+        c.a = trailOpacity * intensity;
+        ofEnableBlendMode(OF_BLENDMODE_ADD);
+        ofSetColor(c);
+        float radius = trailSize * (0.7f + 1.4f * intensity);
+        if (hasTrailPos) {
+            ofSetLineWidth(std::max(1.0f, radius * 0.35f));
+            ofDrawLine(lastTrailPos, pos);
+        }
+        ofDrawCircle(pos, radius);
+        lastTrailPos = pos;
+        hasTrailPos = true;
+    } else {
+        hasTrailPos = false;
+    }
+
+    ofPopStyle();
+    trailFbo.end();
+}
+
+void ofApp::drawTrail() {
+    if (!trailFbo.isAllocated()) {
+        return;
+    }
+
+    ofPushStyle();
+    ofEnableBlendMode(OF_BLENDMODE_ADD);
+    ofSetColor(255);
+    trailFbo.draw(0, 0);
+    ofPopStyle();
+}
+
+ofVec2f ofApp::mapCameraToScreen(const ofVec2f &camPos, float camW, float camH, bool mirrorX) {
+    float dstW = ofGetWidth();
+    float dstH = ofGetHeight();
+    float scale = std::max(dstW / camW, dstH / camH);
+    float drawW = camW * scale;
+    float drawH = camH * scale;
+    float xOffset = (dstW - drawW) * 0.5f;
+    float yOffset = (dstH - drawH) * 0.5f;
+    float screenX = xOffset + camPos.x * scale;
+    float screenY = yOffset + camPos.y * scale;
+    if (mirrorX) {
+        screenX = dstW - screenX;
+    }
+    return {screenX, screenY};
+}
+
 void ofApp::printSettings() {
     ofLogNotice() << "Settings: mode=" << (useShaderKey ? "shader-key" : "bg-sub");
     if (useShaderKey) {
@@ -375,11 +662,27 @@ void ofApp::printSettings() {
                       << " minSat=" << keyMinSat
                       << " minVal=" << keyMinVal
                       << " posterize=" << posterizeLevels
-                      << " edge=" << edgeStrength;
+                      << " edge=" << edgeStrength
+                      << " kaleido=" << (enableKaleido ? "on" : "off")
+                      << " segments=" << kaleidoSegments
+                      << " spin=" << kaleidoSpin
+                      << " halftone=" << (enableHalftone ? "on" : "off")
+                      << " dots=" << halftoneScale;
     } else {
         ofLogNotice() << "BG: threshold=" << maskThreshold
                       << " morph=" << (enableMorph ? "on" : "off")
                       << " blur=" << (enableBlur ? "on" : "off")
                       << " shadows=" << (detectShadows ? "on" : "off");
     }
+
+    ofLogNotice() << "PulseHue: mode=" << pulseHueMode
+                  << " shift=" << pulseHueShiftDeg
+                  << " bpm=" << pulseBpm;
+    ofLogNotice() << "Woofer: " << (enableWoofer ? "on" : "off")
+                  << " strength=" << wooferStrength
+                  << " falloff=" << wooferFalloff;
+    ofLogNotice() << "Trail: " << (enableTrail ? "on" : "off")
+                  << " fade=" << trailFade
+                  << " size=" << trailSize
+                  << " motion=" << motionLevel;
 }
