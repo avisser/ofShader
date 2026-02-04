@@ -24,6 +24,7 @@ void ofApp::setup() {
     ofSetFullscreen(true);
     setupKeyShader();
     midi.setup();
+    setupControls();
 
     listCameras();
     if (!devices.empty()) {
@@ -81,55 +82,7 @@ void ofApp::update() {
     }
 
     midi.update();
-    if (midi.consumeKaleidoPadHit()) {
-        cycleKaleidoMode();
-        printSettings();
-    }
-    if (midi.consumeKaleidoZoomPadHit()) {
-        kaleidoZoomModeIndex = (kaleidoZoomModeIndex + 1) % static_cast<int>(kKaleidoZoomModes.size());
-        kaleidoZoom = kKaleidoZoomModes[static_cast<size_t>(kaleidoZoomModeIndex)];
-        printSettings();
-    }
-    float midiValue = 0.0f;
-    if (midi.consumeKaleidoKnobValue(midiValue)) {
-        kaleidoSegments = ofClamp(midiValue, 0.0f, 1.0f) * 16.0f;
-        enableKaleido = kaleidoSegments > 0.5f;
-    }
-    if (midi.consumeKaleidoZoomKnobValue(midiValue)) {
-        float value01 = ofClamp(midiValue, 0.0f, 1.0f);
-        kaleidoZoom = ofLerp(kaleidoZoomKnobMax, kaleidoZoomKnobMin, value01);
-    }
-    if (midi.consumeHalftonePadHit()) {
-        halftoneModeIndex = (halftoneModeIndex + 1) % static_cast<int>(kHalftoneModes.size());
-        float nextScale = kHalftoneModes[static_cast<size_t>(halftoneModeIndex)];
-        enableHalftone = nextScale > 0.5f;
-        if (enableHalftone) {
-            halftoneScale = nextScale;
-        }
-        printSettings();
-    }
-    if (midi.consumeHalftoneKnobValue(midiValue)) {
-        float value01 = ofClamp(midiValue, 0.0f, 1.0f);
-        halftoneScale = ofLerp(halftoneKnobMin, halftoneKnobMax, value01);
-        enableHalftone = halftoneScale > 0.5f;
-    }
-    if (midi.consumeSaturationPadHit()) {
-        saturationModeIndex = (saturationModeIndex + 1) % static_cast<int>(kSaturationModes.size());
-        float mode = kSaturationModes[static_cast<size_t>(saturationModeIndex)];
-        if (mode < 0.0f) {
-            enableSaturation = false;
-            saturationScale = 1.0f;
-        } else {
-            enableSaturation = true;
-            saturationScale = mode;
-        }
-        printSettings();
-    }
-    if (midi.consumeSaturationKnobValue(midiValue)) {
-        float value01 = ofClamp(midiValue, 0.0f, 1.0f);
-        enableSaturation = true;
-        saturationScale = value01;
-    }
+    handleMidiControls();
 
     updateTrail(ofGetLastFrameTime());
 }
@@ -206,20 +159,8 @@ void ofApp::draw() {
 
 void ofApp::keyPressed(int key) {
     static const std::array<int, 3> kWooferModes = {0, 1, 1};
-    if (key == 'K' || (key == 'k' && ofGetKeyPressed(OF_KEY_SHIFT))) {
-        midi.beginLearnKaleido();
-        return;
-    }
-    if (key == 'Z' || (key == 'z' && ofGetKeyPressed(OF_KEY_SHIFT))) {
-        midi.beginLearnKaleidoZoom();
-        return;
-    }
-    if (key == 'D' || (key == 'd' && ofGetKeyPressed(OF_KEY_SHIFT))) {
-        midi.beginLearnHalftone();
-        return;
-    }
-    if (key == 'V' || (key == 'v' && ofGetKeyPressed(OF_KEY_SHIFT))) {
-        midi.beginLearnSaturation();
+    if (handleControlKey(key)) {
+        printSettings();
         return;
     }
     if (key == 'f') {
@@ -234,13 +175,6 @@ void ofApp::keyPressed(int key) {
         useShaderKey = false;
         resetBackgroundSubtractor();
         printSettings();
-    } else if (key == 'k') {
-        cycleKaleidoMode();
-        printSettings();
-    } else if (key == 'z') {
-        kaleidoZoomModeIndex = (kaleidoZoomModeIndex + 1) % static_cast<int>(kKaleidoZoomModes.size());
-        kaleidoZoom = kKaleidoZoomModes[static_cast<size_t>(kaleidoZoomModeIndex)];
-        printSettings();
     } else if (key == 'c') {
         enableTrail = !enableTrail;
         hasTrailPos = false;
@@ -249,29 +183,6 @@ void ofApp::keyPressed(int key) {
             ofClear(0, 0, 0, 0);
             trailFbo.end();
         }
-        printSettings();
-    } else if (key == 'd') {
-        halftoneModeIndex = (halftoneModeIndex + 1) % static_cast<int>(kHalftoneModes.size());
-        float nextScale = kHalftoneModes[static_cast<size_t>(halftoneModeIndex)];
-        enableHalftone = nextScale > 0.5f;
-        if (enableHalftone) {
-            halftoneScale = nextScale;
-        }
-        printSettings();
-    } else if (key == 'v') {
-        saturationModeIndex = (saturationModeIndex + 1) % static_cast<int>(kSaturationModes.size());
-        float mode = kSaturationModes[static_cast<size_t>(saturationModeIndex)];
-        if (mode < 0.0f) {
-            enableSaturation = false;
-            saturationScale = 1.0f;
-        } else {
-            enableSaturation = true;
-            saturationScale = mode;
-        }
-        printSettings();
-    } else if (key == 't') {
-        tempoIndex = (tempoIndex + 1) % static_cast<int>(kTempoPresets.size());
-        pulseBpm = kTempoPresets[static_cast<size_t>(tempoIndex)];
         printSettings();
     } else if (key == 'p') {
         midi.cyclePort();
@@ -478,10 +389,196 @@ void ofApp::drawTextureCover(ofTexture &tex, float dstW, float dstH, bool mirror
     }
 }
 
-void ofApp::cycleKaleidoMode() {
-    kaleidoModeIndex = (kaleidoModeIndex + 1) % static_cast<int>(kKaleidoModes.size());
-    kaleidoSegments = kKaleidoModes[static_cast<size_t>(kaleidoModeIndex)];
-    enableKaleido = kaleidoSegments > 0.5f;
+void ofApp::setupControls() {
+    controls.clear();
+
+    auto addControl = [&](ControlSpec control) {
+        if (!control.presets.empty()) {
+            control.value = control.presets[control.presetIndex % static_cast<int>(control.presets.size())];
+        } else {
+            control.value = ofLerp(control.knobMin, control.knobMax, 0.5f);
+        }
+
+        if (control.id == "saturation" && control.value < 0.0f) {
+            control.enabled = false;
+            control.value = 1.0f;
+        } else if (control.hasOff) {
+            control.enabled = control.value > 0.5f;
+        } else {
+            control.enabled = true;
+        }
+
+        controls.push_back(control);
+        midi.registerControl(control.id);
+    };
+
+    addControl({
+        "kaleido",
+        'k',
+        'K',
+        std::vector<float>(kKaleidoModes.begin(), kKaleidoModes.end()),
+        0.0f,
+        16.0f,
+        true,
+        2
+    });
+
+    addControl({
+        "kaleidoZoom",
+        'z',
+        'Z',
+        std::vector<float>(kKaleidoZoomModes.begin(), kKaleidoZoomModes.end()),
+        kaleidoZoomKnobMax,
+        kaleidoZoomKnobMin,
+        false,
+        1
+    });
+
+    addControl({
+        "halftone",
+        'd',
+        'D',
+        std::vector<float>(kHalftoneModes.begin(), kHalftoneModes.end()),
+        halftoneKnobMin,
+        halftoneKnobMax,
+        true,
+        0
+    });
+
+    addControl({
+        "tempo",
+        't',
+        'T',
+        std::vector<float>(kTempoPresets.begin(), kTempoPresets.end()),
+        60.0f,
+        120.0f,
+        false,
+        0
+    });
+
+    addControl({
+        "saturation",
+        'v',
+        'V',
+        std::vector<float>(kSaturationModes.begin(), kSaturationModes.end()),
+        0.0f,
+        1.0f,
+        true,
+        0
+    });
+
+    for (const auto &control : controls) {
+        applyControl(control);
+    }
+}
+
+void ofApp::handleMidiControls() {
+    bool changed = false;
+    float value01 = 0.0f;
+    for (auto &control : controls) {
+        if (midi.consumePadHit(control.id)) {
+            cycleControlPreset(control);
+            changed = true;
+        }
+        if (midi.consumeKnobValue(control.id, value01)) {
+            float clamped = ofClamp(value01, 0.0f, 1.0f);
+            control.value = ofLerp(control.knobMin, control.knobMax, clamped);
+            if (control.id == "saturation") {
+                control.enabled = true;
+            } else if (control.hasOff) {
+                control.enabled = control.value > 0.5f;
+            } else {
+                control.enabled = true;
+            }
+            changed = true;
+        }
+        applyControl(control);
+    }
+
+    if (changed) {
+        printSettings();
+    }
+}
+
+bool ofApp::handleControlKey(int key) {
+    for (auto &control : controls) {
+        if (key == control.learnKey || (key == control.key && ofGetKeyPressed(OF_KEY_SHIFT))) {
+            midi.beginLearn(control.id);
+            return true;
+        }
+    }
+
+    for (auto &control : controls) {
+        if (key == control.key) {
+            cycleControlPreset(control);
+            applyControl(control);
+            return true;
+        }
+    }
+    return false;
+}
+
+ofApp::ControlSpec *ofApp::findControlByKey(char key) {
+    for (auto &control : controls) {
+        if (control.key == key) {
+            return &control;
+        }
+    }
+    return nullptr;
+}
+
+ofApp::ControlSpec *ofApp::findControlById(const std::string &id) {
+    for (auto &control : controls) {
+        if (control.id == id) {
+            return &control;
+        }
+    }
+    return nullptr;
+}
+
+void ofApp::cycleControlPreset(ControlSpec &control) {
+    if (control.presets.empty()) {
+        return;
+    }
+    control.presetIndex = (control.presetIndex + 1) % static_cast<int>(control.presets.size());
+    float value = control.presets[control.presetIndex];
+    if (control.id == "saturation" && value < 0.0f) {
+        control.enabled = false;
+        control.value = 1.0f;
+        return;
+    }
+    control.value = value;
+    if (control.hasOff) {
+        control.enabled = control.value > 0.5f;
+    } else {
+        control.enabled = true;
+    }
+}
+
+void ofApp::applyControl(const ControlSpec &control) {
+    if (control.id == "kaleido") {
+        kaleidoSegments = control.value;
+        enableKaleido = control.enabled;
+        return;
+    }
+    if (control.id == "kaleidoZoom") {
+        kaleidoZoom = control.value;
+        return;
+    }
+    if (control.id == "halftone") {
+        halftoneScale = control.value;
+        enableHalftone = control.enabled;
+        return;
+    }
+    if (control.id == "tempo") {
+        pulseBpm = control.value;
+        return;
+    }
+    if (control.id == "saturation") {
+        saturationScale = control.value;
+        enableSaturation = control.enabled;
+        return;
+    }
 }
 
 void ofApp::updateMotion(const ofPixels &camPixels) {

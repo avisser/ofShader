@@ -58,131 +58,46 @@ void MidiControl::update() {
     }
 }
 
-void MidiControl::beginLearnKaleido() {
+void MidiControl::registerControl(const std::string &id) {
+    if (id.empty()) {
+        return;
+    }
+    bindings[id];
+}
+
+void MidiControl::beginLearn(const std::string &id) {
+    if (id.empty()) {
+        return;
+    }
+    registerControl(id);
     learn = LearnState{};
     learn.active = true;
-    learn.target = LearnTarget::Kaleido;
-    ofLogNotice() << "MIDI learn (kaleido): waiting for pad or knob input.";
+    learn.targetId = id;
+    ofLogNotice() << "MIDI learn (" << id << "): waiting for pad or knob input.";
 }
 
-void MidiControl::beginLearnKaleidoZoom() {
-    learn = LearnState{};
-    learn.active = true;
-    learn.target = LearnTarget::KaleidoZoom;
-    ofLogNotice() << "MIDI learn (kaleido zoom): waiting for pad or knob input.";
-}
-
-void MidiControl::beginLearnHalftone() {
-    learn = LearnState{};
-    learn.active = true;
-    learn.target = LearnTarget::Halftone;
-    ofLogNotice() << "MIDI learn (halftone): waiting for pad or knob input.";
-}
-
-void MidiControl::beginLearnSaturation() {
-    learn = LearnState{};
-    learn.active = true;
-    learn.target = LearnTarget::Saturation;
-    ofLogNotice() << "MIDI learn (saturation): waiting for pad or knob input.";
-}
-
-bool MidiControl::isLearningKaleido() const {
-    return learn.active && learn.target == LearnTarget::Kaleido;
-}
-
-bool MidiControl::isLearningKaleidoZoom() const {
-    return learn.active && learn.target == LearnTarget::KaleidoZoom;
-}
-
-bool MidiControl::isLearningHalftone() const {
-    return learn.active && learn.target == LearnTarget::Halftone;
-}
-
-bool MidiControl::isLearningSaturation() const {
-    return learn.active && learn.target == LearnTarget::Saturation;
-}
-
-bool MidiControl::consumeKaleidoPadHit() {
-    if (!kaleidoBinding.padHit) {
+bool MidiControl::consumePadHit(const std::string &id) {
+    auto it = bindings.find(id);
+    if (it == bindings.end()) {
         return false;
     }
-    kaleidoBinding.padHit = false;
+    if (!it->second.padHit) {
+        return false;
+    }
+    it->second.padHit = false;
     return true;
 }
 
-bool MidiControl::consumeKaleidoZoomPadHit() {
-    if (!kaleidoZoomBinding.padHit) {
+bool MidiControl::consumeKnobValue(const std::string &id, float &outValue01) {
+    auto it = bindings.find(id);
+    if (it == bindings.end()) {
         return false;
     }
-    kaleidoZoomBinding.padHit = false;
-    return true;
-}
-
-bool MidiControl::consumeHalftonePadHit() {
-    if (!halftoneBinding.padHit) {
+    if (!it->second.knobUpdated) {
         return false;
     }
-    halftoneBinding.padHit = false;
-    return true;
-}
-
-bool MidiControl::consumeSaturationPadHit() {
-    if (!saturationBinding.padHit) {
-        return false;
-    }
-    saturationBinding.padHit = false;
-    return true;
-}
-
-bool MidiControl::hasKaleidoKnobBinding() const {
-    return kaleidoBinding.knob.valid();
-}
-
-bool MidiControl::hasKaleidoZoomKnobBinding() const {
-    return kaleidoZoomBinding.knob.valid();
-}
-
-bool MidiControl::hasHalftoneKnobBinding() const {
-    return halftoneBinding.knob.valid();
-}
-
-bool MidiControl::hasSaturationKnobBinding() const {
-    return saturationBinding.knob.valid();
-}
-
-bool MidiControl::consumeKaleidoKnobValue(float &outValue01) {
-    if (!kaleidoBinding.knobUpdated) {
-        return false;
-    }
-    kaleidoBinding.knobUpdated = false;
-    outValue01 = kaleidoBinding.knob.value01;
-    return true;
-}
-
-bool MidiControl::consumeKaleidoZoomKnobValue(float &outValue01) {
-    if (!kaleidoZoomBinding.knobUpdated) {
-        return false;
-    }
-    kaleidoZoomBinding.knobUpdated = false;
-    outValue01 = kaleidoZoomBinding.knob.value01;
-    return true;
-}
-
-bool MidiControl::consumeHalftoneKnobValue(float &outValue01) {
-    if (!halftoneBinding.knobUpdated) {
-        return false;
-    }
-    halftoneBinding.knobUpdated = false;
-    outValue01 = halftoneBinding.knob.value01;
-    return true;
-}
-
-bool MidiControl::consumeSaturationKnobValue(float &outValue01) {
-    if (!saturationBinding.knobUpdated) {
-        return false;
-    }
-    saturationBinding.knobUpdated = false;
-    outValue01 = saturationBinding.knob.value01;
+    it->second.knobUpdated = false;
+    outValue01 = it->second.knob.value01;
     return true;
 }
 
@@ -211,66 +126,28 @@ void MidiControl::processMessage(const ofxMidiMessage &message) {
         return;
     }
 
-    if (kaleidoBinding.pad.valid() && message.status == MIDI_NOTE_ON && message.velocity > 0) {
-        if (message.channel == kaleidoBinding.pad.channel && message.pitch == kaleidoBinding.pad.note) {
-            kaleidoBinding.padHit = true;
-        }
-    }
-
-    if (kaleidoZoomBinding.pad.valid() && message.status == MIDI_NOTE_ON && message.velocity > 0) {
-        if (message.channel == kaleidoZoomBinding.pad.channel && message.pitch == kaleidoZoomBinding.pad.note) {
-            kaleidoZoomBinding.padHit = true;
-        }
-    }
-
-    if (halftoneBinding.pad.valid() && message.status == MIDI_NOTE_ON && message.velocity > 0) {
-        if (message.channel == halftoneBinding.pad.channel && message.pitch == halftoneBinding.pad.note) {
-            halftoneBinding.padHit = true;
-        }
-    }
-
-    if (saturationBinding.pad.valid() && message.status == MIDI_NOTE_ON && message.velocity > 0) {
-        if (message.channel == saturationBinding.pad.channel && message.pitch == saturationBinding.pad.note) {
-            saturationBinding.padHit = true;
-        }
-    }
-
-    if (kaleidoBinding.knob.valid() && message.status == MIDI_CONTROL_CHANGE) {
-        if (message.channel == kaleidoBinding.knob.channel && message.control == kaleidoBinding.knob.control) {
-            float value01 = ofClamp(message.value / 127.0f, 0.0f, 1.0f);
-            if (std::abs(value01 - kaleidoBinding.knob.value01) > 0.0005f) {
-                kaleidoBinding.knob.value01 = value01;
-                kaleidoBinding.knobUpdated = true;
+    if (message.status == MIDI_NOTE_ON && message.velocity > 0) {
+        for (auto &entry : bindings) {
+            auto &binding = entry.second;
+            if (binding.pad.valid() &&
+                message.channel == binding.pad.channel &&
+                message.pitch == binding.pad.note) {
+                binding.padHit = true;
             }
         }
     }
 
-    if (kaleidoZoomBinding.knob.valid() && message.status == MIDI_CONTROL_CHANGE) {
-        if (message.channel == kaleidoZoomBinding.knob.channel && message.control == kaleidoZoomBinding.knob.control) {
-            float value01 = ofClamp(message.value / 127.0f, 0.0f, 1.0f);
-            if (std::abs(value01 - kaleidoZoomBinding.knob.value01) > 0.0005f) {
-                kaleidoZoomBinding.knob.value01 = value01;
-                kaleidoZoomBinding.knobUpdated = true;
-            }
-        }
-    }
-
-    if (halftoneBinding.knob.valid() && message.status == MIDI_CONTROL_CHANGE) {
-        if (message.channel == halftoneBinding.knob.channel && message.control == halftoneBinding.knob.control) {
-            float value01 = ofClamp(message.value / 127.0f, 0.0f, 1.0f);
-            if (std::abs(value01 - halftoneBinding.knob.value01) > 0.0005f) {
-                halftoneBinding.knob.value01 = value01;
-                halftoneBinding.knobUpdated = true;
-            }
-        }
-    }
-
-    if (saturationBinding.knob.valid() && message.status == MIDI_CONTROL_CHANGE) {
-        if (message.channel == saturationBinding.knob.channel && message.control == saturationBinding.knob.control) {
-            float value01 = ofClamp(message.value / 127.0f, 0.0f, 1.0f);
-            if (std::abs(value01 - saturationBinding.knob.value01) > 0.0005f) {
-                saturationBinding.knob.value01 = value01;
-                saturationBinding.knobUpdated = true;
+    if (message.status == MIDI_CONTROL_CHANGE) {
+        for (auto &entry : bindings) {
+            auto &binding = entry.second;
+            if (binding.knob.valid() &&
+                message.channel == binding.knob.channel &&
+                message.control == binding.knob.control) {
+                float value01 = ofClamp(message.value / 127.0f, 0.0f, 1.0f);
+                if (std::abs(value01 - binding.knob.value01) > 0.0005f) {
+                    binding.knob.value01 = value01;
+                    binding.knobUpdated = true;
+                }
             }
         }
     }
@@ -294,42 +171,28 @@ void MidiControl::processLearning(const ofxMidiMessage &message) {
 }
 
 void MidiControl::finalizeLearning() {
-    Binding *binding = nullptr;
-    const char *targetName = "unknown";
-    if (learn.target == LearnTarget::Kaleido) {
-        binding = &kaleidoBinding;
-        targetName = "kaleido";
-    } else if (learn.target == LearnTarget::KaleidoZoom) {
-        binding = &kaleidoZoomBinding;
-        targetName = "kaleidoZoom";
-    } else if (learn.target == LearnTarget::Halftone) {
-        binding = &halftoneBinding;
-        targetName = "halftone";
-    } else if (learn.target == LearnTarget::Saturation) {
-        binding = &saturationBinding;
-        targetName = "saturation";
-    }
-
-    if (!binding) {
+    if (learn.targetId.empty()) {
         ofLogWarning() << "MIDI learn: invalid target.";
         learn.active = false;
         learn.windowStarted = false;
         return;
     }
 
+    Binding &binding = bindings[learn.targetId];
+
     if (learn.ccCount >= 5 && learn.lastCc >= 0) {
-        binding->knob.channel = learn.lastCcChannel;
-        binding->knob.control = learn.lastCc;
-        binding->knob.value01 = 0.0f;
-        ofLogNotice() << "MIDI learn (" << targetName << "): bound knob CC "
-                      << binding->knob.control << " on channel " << binding->knob.channel;
+        binding.knob.channel = learn.lastCcChannel;
+        binding.knob.control = learn.lastCc;
+        binding.knob.value01 = 0.0f;
+        ofLogNotice() << "MIDI learn (" << learn.targetId << "): bound knob CC "
+                      << binding.knob.control << " on channel " << binding.knob.channel;
     } else if (learn.noteCount >= 1 && learn.lastNote >= 0) {
-        binding->pad.channel = learn.lastNoteChannel;
-        binding->pad.note = learn.lastNote;
-        ofLogNotice() << "MIDI learn (" << targetName << "): bound pad note "
-                      << binding->pad.note << " on channel " << binding->pad.channel;
+        binding.pad.channel = learn.lastNoteChannel;
+        binding.pad.note = learn.lastNote;
+        ofLogNotice() << "MIDI learn (" << learn.targetId << "): bound pad note "
+                      << binding.pad.note << " on channel " << binding.pad.channel;
     } else {
-        ofLogWarning() << "MIDI learn (" << targetName << "): no valid input detected.";
+        ofLogWarning() << "MIDI learn (" << learn.targetId << "): no valid input detected.";
     }
 
     learn.active = false;
@@ -430,7 +293,7 @@ bool MidiControl::loadSettings() {
 
     ofBuffer buffer = file.readToBuffer();
     DeviceSettings *currentDevice = nullptr;
-    std::string currentTarget;
+    std::string currentControl;
     std::string currentType;
 
     auto trim = [](const std::string &s) {
@@ -480,7 +343,7 @@ bool MidiControl::loadSettings() {
             savedDevices.push_back(DeviceSettings{});
             savedDevices.back().name = name;
             currentDevice = &savedDevices.back();
-            currentTarget.clear();
+            currentControl.clear();
             currentType.clear();
             continue;
         }
@@ -489,8 +352,8 @@ bool MidiControl::loadSettings() {
             continue;
         }
 
-        if (trimmed.rfind("- target:", 0) == 0) {
-            currentTarget = parseValue(trimmed);
+        if (trimmed.rfind("- target:", 0) == 0 || trimmed.rfind("- control:", 0) == 0) {
+            currentControl = parseValue(trimmed);
             currentType.clear();
             continue;
         }
@@ -500,10 +363,10 @@ bool MidiControl::loadSettings() {
             continue;
         }
 
-        Binding *binding = bindingForTarget(*currentDevice, currentTarget);
-        if (!binding) {
+        if (currentControl.empty()) {
             continue;
         }
+        Binding &binding = currentDevice->bindings[currentControl];
 
         if (trimmed.rfind("channel:", 0) == 0) {
             int channel = -1;
@@ -513,9 +376,9 @@ bool MidiControl::loadSettings() {
                 continue;
             }
             if (currentType == "pad") {
-                binding->pad.channel = channel;
+                binding.pad.channel = channel;
             } else if (currentType == "knob") {
-                binding->knob.channel = channel;
+                binding.knob.channel = channel;
             }
             continue;
         }
@@ -528,7 +391,7 @@ bool MidiControl::loadSettings() {
                 continue;
             }
             if (currentType == "pad") {
-                binding->pad.note = note;
+                binding.pad.note = note;
             }
             continue;
         }
@@ -541,7 +404,7 @@ bool MidiControl::loadSettings() {
                 continue;
             }
             if (currentType == "knob") {
-                binding->knob.control = control;
+                binding.knob.control = control;
             }
             continue;
         }
@@ -573,10 +436,20 @@ void MidiControl::saveSettings() {
         }
         out << "  - name: \"" << device.name << "\"\n";
         out << "    bindings:\n";
-        writeBinding(out, "kaleido", device.kaleido.pad, device.kaleido.knob);
-        writeBinding(out, "kaleidoZoom", device.kaleidoZoom.pad, device.kaleidoZoom.knob);
-        writeBinding(out, "halftone", device.halftone.pad, device.halftone.knob);
-        writeBinding(out, "saturation", device.saturation.pad, device.saturation.knob);
+        std::vector<std::string> keys;
+        keys.reserve(device.bindings.size());
+        for (const auto &entry : device.bindings) {
+            keys.push_back(entry.first);
+        }
+        std::sort(keys.begin(), keys.end());
+        for (const auto &key : keys) {
+            auto it = device.bindings.find(key);
+            if (it == device.bindings.end()) {
+                continue;
+            }
+            const auto &binding = it->second;
+            writeBinding(out, key, binding.pad, binding.knob);
+        }
     }
 
     ofBuffer buffer(out.str().c_str(), out.str().size());
@@ -595,10 +468,7 @@ bool MidiControl::applySettingsForAvailableDevice() {
         int portIndex = findInPortByName(device.name);
         if (portIndex >= 0) {
             openPort(portIndex);
-            kaleidoBinding = device.kaleido;
-            kaleidoZoomBinding = device.kaleidoZoom;
-            halftoneBinding = device.halftone;
-            saturationBinding = device.saturation;
+            bindings = device.bindings;
             ofLogNotice() << "MIDI settings: loaded bindings for device \""
                           << device.name << "\".";
             return true;
@@ -633,22 +503,6 @@ int MidiControl::findInPortByName(const std::string &name) {
     return fallback;
 }
 
-MidiControl::Binding *MidiControl::bindingForTarget(DeviceSettings &device, const std::string &target) {
-    if (target == "kaleido") {
-        return &device.kaleido;
-    }
-    if (target == "kaleidoZoom") {
-        return &device.kaleidoZoom;
-    }
-    if (target == "halftone") {
-        return &device.halftone;
-    }
-    if (target == "saturation") {
-        return &device.saturation;
-    }
-    return nullptr;
-}
-
 MidiControl::DeviceSettings MidiControl::buildCurrentDeviceSettings() {
     DeviceSettings device;
     if (midiIn.getNumInPorts() <= 0) {
@@ -657,22 +511,17 @@ MidiControl::DeviceSettings MidiControl::buildCurrentDeviceSettings() {
     if (currentPort >= 0 && currentPort < midiIn.getNumInPorts()) {
         device.name = midiIn.getInPortName(currentPort);
     }
-    device.kaleido = kaleidoBinding;
-    device.kaleidoZoom = kaleidoZoomBinding;
-    device.halftone = halftoneBinding;
-    device.saturation = saturationBinding;
-    device.kaleido.padHit = false;
-    device.kaleidoZoom.padHit = false;
-    device.halftone.padHit = false;
-    device.saturation.padHit = false;
-    device.kaleido.knobUpdated = false;
-    device.kaleidoZoom.knobUpdated = false;
-    device.halftone.knobUpdated = false;
-    device.saturation.knobUpdated = false;
-    device.kaleido.knob.value01 = 0.0f;
-    device.kaleidoZoom.knob.value01 = 0.0f;
-    device.halftone.knob.value01 = 0.0f;
-    device.saturation.knob.value01 = 0.0f;
+    for (const auto &entry : bindings) {
+        const auto &id = entry.first;
+        const auto &binding = entry.second;
+        Binding clean = binding;
+        clean.padHit = false;
+        clean.knobUpdated = false;
+        clean.knob.value01 = 0.0f;
+        if (clean.pad.valid() || clean.knob.valid()) {
+            device.bindings[id] = clean;
+        }
+    }
     return device;
 }
 
@@ -681,13 +530,13 @@ void MidiControl::writeBinding(std::ostream &out,
                                const PadBinding &pad,
                                const KnobBinding &knob) const {
     if (pad.valid()) {
-        out << "      - target: " << target << "\n";
+        out << "      - control: " << target << "\n";
         out << "        type: pad\n";
         out << "        channel: " << pad.channel << "\n";
         out << "        note: " << pad.note << "\n";
     }
     if (knob.valid()) {
-        out << "      - target: " << target << "\n";
+        out << "      - control: " << target << "\n";
         out << "        type: knob\n";
         out << "        channel: " << knob.channel << "\n";
         out << "        control: " << knob.control << "\n";

@@ -40,7 +40,27 @@ private:
     void drawTextureCover(ofTexture &tex, float dstW, float dstH, bool mirrorX);
     void printSettings();
     void setupKeyShader();
-    void cycleKaleidoMode();
+    void setupControls();
+    void handleMidiControls();
+    bool handleControlKey(int key);
+
+    struct ControlSpec {
+        std::string id;
+        char key = 0;
+        char learnKey = 0;
+        std::vector<float> presets;
+        float knobMin = 0.0f;
+        float knobMax = 1.0f;
+        bool hasOff = false;
+        int presetIndex = 0;
+        float value = 0.0f;
+        bool enabled = true;
+    };
+
+    ControlSpec *findControlByKey(char key);
+    ControlSpec *findControlById(const std::string &id);
+    void cycleControlPreset(ControlSpec &control);
+    void applyControl(const ControlSpec &control);
 
     AppConfig config;
 
@@ -90,22 +110,17 @@ private:
     float kaleidoSegments = 6.0f;
     float kaleidoSpin = 0.0f;
     float kaleidoZoom = 0.7f;
-    int kaleidoModeIndex = 2;
-    int kaleidoZoomModeIndex = 0;
     float kaleidoZoomKnobMin = 0.3f;
     float kaleidoZoomKnobMax = 1.0f;
     bool enableHalftone = false;
     float halftoneScale = 14.0f;
     float halftoneEdge = 0.3f;
-    int halftoneModeIndex = 0;
     float halftoneKnobMin = 6.0f;
     float halftoneKnobMax = 30.0f;
 
     bool enableSaturation = false;
     float saturationScale = 1.0f;
-    int saturationModeIndex = 0;
-
-    int tempoIndex = 0;
+    std::vector<ControlSpec> controls;
     float beatFlashSeconds = 0.12f;
     float beatDotRadius = 10.0f;
     float beatDownbeatRadius = 20.0f;

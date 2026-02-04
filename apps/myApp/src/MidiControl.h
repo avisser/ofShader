@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <iosfwd>
+#include <unordered_map>
 
 class MidiControl : public ofxMidiListener {
 public:
@@ -16,38 +17,14 @@ public:
     void cyclePort();
     void toggleOutputTest();
 
-    void beginLearnKaleido();
-    void beginLearnKaleidoZoom();
-    void beginLearnHalftone();
-    void beginLearnSaturation();
-    bool isLearningKaleido() const;
-    bool isLearningKaleidoZoom() const;
-    bool isLearningHalftone() const;
-    bool isLearningSaturation() const;
-
-    bool consumeKaleidoPadHit();
-    bool consumeKaleidoZoomPadHit();
-    bool consumeHalftonePadHit();
-    bool consumeSaturationPadHit();
-    bool hasKaleidoKnobBinding() const;
-    bool hasKaleidoZoomKnobBinding() const;
-    bool hasHalftoneKnobBinding() const;
-    bool hasSaturationKnobBinding() const;
-    bool consumeKaleidoKnobValue(float &outValue01);
-    bool consumeKaleidoZoomKnobValue(float &outValue01);
-    bool consumeHalftoneKnobValue(float &outValue01);
-    bool consumeSaturationKnobValue(float &outValue01);
+    void registerControl(const std::string &id);
+    void beginLearn(const std::string &id);
+    bool consumePadHit(const std::string &id);
+    bool consumeKnobValue(const std::string &id, float &outValue01);
 
     void newMidiMessage(ofxMidiMessage &message) override;
 
 private:
-    enum class LearnTarget {
-        Kaleido,
-        KaleidoZoom,
-        Halftone,
-        Saturation
-    };
-
     struct PadBinding {
         int channel = -1;
         int note = -1;
@@ -70,10 +47,7 @@ private:
 
     struct DeviceSettings {
         std::string name;
-        Binding kaleido;
-        Binding kaleidoZoom;
-        Binding halftone;
-        Binding saturation;
+        std::unordered_map<std::string, Binding> bindings;
     };
 
     struct LearnState {
@@ -86,7 +60,7 @@ private:
         int lastNoteChannel = -1;
         int lastCc = -1;
         int lastCcChannel = -1;
-        LearnTarget target = LearnTarget::Kaleido;
+        std::string targetId;
     };
 
     void processMessage(const ofxMidiMessage &message);
@@ -99,7 +73,6 @@ private:
     void saveSettings();
     bool applySettingsForAvailableDevice();
     int findInPortByName(const std::string &name);
-    Binding *bindingForTarget(DeviceSettings &device, const std::string &target);
     DeviceSettings buildCurrentDeviceSettings();
     void writeBinding(std::ostream &out,
                       const std::string &target,
@@ -130,8 +103,5 @@ private:
     std::vector<DeviceSettings> savedDevices;
 
     LearnState learn;
-    Binding kaleidoBinding;
-    Binding kaleidoZoomBinding;
-    Binding halftoneBinding;
-    Binding saturationBinding;
+    std::unordered_map<std::string, Binding> bindings;
 };

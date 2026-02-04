@@ -24,6 +24,7 @@
 - `v` Cycle saturation presets (off → 0.2 → 0.45 → 0.7 → 0.9 → off).
 - `Shift+V` Enter MIDI learn mode for saturation (first pad/knob binds).
 - `t` Cycle tempo (60 → 80 → 100 → 120).
+- `Shift+T` Enter MIDI learn mode for tempo (first pad/knob binds).
 - `c` Toggle paint trail.
 - `b` Cycle woofer distortion (off → on → on → off).
 - `p` Cycle MIDI input ports.
@@ -61,4 +62,7 @@
 - Learn saturation: press `Shift+V`, then move a knob (CC flood) or hit a pad (NoteOn).
 - Saturation pad: cycles the 4 presets plus off.
 - Saturation knob: sets saturation continuously (0 = B/W, 1 = full color).
+- Learn tempo: press `Shift+T`, then move a knob (CC flood) or hit a pad (NoteOn).
+- Tempo pad: cycles tempo presets.
+- Tempo knob: sets BPM continuously (60 → 120).
 - Settings are persisted to `bin/data/settings.yaml` and loaded on startup. The device name is matched against available MIDI ports; a warning is logged if no match is found.
