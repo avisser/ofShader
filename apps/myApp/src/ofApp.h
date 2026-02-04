@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+#include "MidiControl.h"
+
 struct AppConfig {
     std::string bgPath = "bg.jpg";
     int camIndex = 0;
@@ -38,12 +40,15 @@ private:
     void drawTextureCover(ofTexture &tex, float dstW, float dstH, bool mirrorX);
     void printSettings();
     void setupKeyShader();
+    void cycleKaleidoMode();
 
     AppConfig config;
 
     ofVideoGrabber grabber;
     std::vector<ofVideoDevice> devices;
     int currentDevice = 0;
+
+    MidiControl midi;
 
     cv::Ptr<cv::BackgroundSubtractorMOG2> bgSub;
     cv::Mat mask;
@@ -77,7 +82,7 @@ private:
     float pulseDecay = 1.8f;
     float pulseHueBoost = 2.0f;
     int pulseHueMode = 0;
-    bool enableWoofer = true;
+    bool enableWoofer = false;
     float wooferStrength = 0.22f;
     float wooferFalloff = 1.5f;
     int wooferModeIndex = 0;
@@ -90,6 +95,8 @@ private:
     float halftoneScale = 14.0f;
     float halftoneEdge = 0.3f;
     int halftoneModeIndex = 0;
+    float halftoneKnobMin = 6.0f;
+    float halftoneKnobMax = 30.0f;
 
     bool enableTrail = true;
     ofFbo trailFbo;

@@ -1,0 +1,34 @@
+version: "3"
+
+vars:
+  OF_PATH: /Users/avisser/source/openFrameworks
+  PROJECT_PATH: /Users/avisser/source/ofShader/apps/myApp
+  ADDONS: "ofxOpenCv,ofxMidi"
+
+tasks:
+  regen:
+    desc: Regenerate the Xcode project via the openFrameworks Project Generator
+    cmds:
+      - |
+        set -e
+        OF_PATH="{{.OF_PATH}}"
+        PROJECT_PATH="{{.PROJECT_PATH}}"
+        if [ "$PROJECT_PATH" = "$OF_PATH" ]; then
+          echo "Refusing to run: PROJECT_PATH equals OF_PATH"
+          echo "Edit Taskfile.yml and set PROJECT_PATH to your app (e.g. /Users/avisser/source/ofShader/apps/myApp)."
+          exit 1
+        fi
+        PG_CLI="$OF_PATH/projectGenerator/projectGenerator.app/Contents/Resources/app/app/projectGenerator"
+        PG_APP="$OF_PATH/projectGenerator/projectGenerator.app/Contents/MacOS/projectGenerator"
+        PG_BIN="$OF_PATH/projectGenerator/projectGenerator"
+        if [ -x "$PG_CLI" ]; then
+          "$PG_CLI" -o"$OF_PATH" -a"{{.ADDONS}}" "$PROJECT_PATH"
+        elif [ -x "$PG_BIN" ]; then
+          "$PG_BIN" -o"$OF_PATH" -a"{{.ADDONS}}" "$PROJECT_PATH"
+        elif [ -x "$PG_APP" ]; then
+          "$PG_APP" -o"$OF_PATH" -a"{{.ADDONS}}" "$PROJECT_PATH"
+        else
+          echo "Project Generator not found under $OF_PATH/projectGenerator"
+          echo "Edit Taskfile.yml and set OF_PATH to your openFrameworks root."
+          exit 1
+        fi

@@ -6,6 +6,11 @@
 #include <array>
 #include <cmath>
 
+namespace {
+constexpr std::array<float, 6> kKaleidoModes = {0.0f, 4.0f, 6.0f, 8.0f, 10.0f, 12.0f};
+constexpr std::array<float, 4> kHalftoneModes = {0.0f, 10.0f, 14.0f, 22.0f};
+}
+
 ofApp::ofApp(const AppConfig &config)
 : config(config) {}
 
@@ -14,6 +19,7 @@ void ofApp::setup() {
     ofSetFrameRate(config.camFps);
     ofSetFullscreen(true);
     setupKeyShader();
+    midi.setup();
 
     listCameras();
     if (!devices.empty()) {
@@ -213,6 +219,30 @@ void ofApp::update() {
         }
     }
 
+    midi.update();
+    if (midi.consumeKaleidoPadHit()) {
+        cycleKaleidoMode();
+        printSettings();
+    }
+    if (midi.hasKaleidoKnobBinding()) {
+        kaleidoSegments = ofClamp(midi.getKaleidoKnobValue01(), 0.0f, 1.0f) * 16.0f;
+        enableKaleido = kaleidoSegments > 0.5f;
+    }
+    if (midi.consumeHalftonePadHit()) {
+        halftoneModeIndex = (halftoneModeIndex + 1) % static_cast<int>(kHalftoneModes.size());
+        float nextScale = kHalftoneModes[static_cast<size_t>(halftoneModeIndex)];
+        enableHalftone = nextScale > 0.5f;
+        if (enableHalftone) {
+            halftoneScale = nextScale;
+        }
+        printSettings();
+    }
+    if (midi.hasHalftoneKnobBinding()) {
+        float value01 = ofClamp(midi.getHalftoneKnobValue01(), 0.0f, 1.0f);
+        halftoneScale = ofLerp(halftoneKnobMin, halftoneKnobMax, value01);
+        enableHalftone = halftoneScale > 0.5f;
+    }
+
     updateTrail(ofGetLastFrameTime());
 }
 
@@ -269,9 +299,15 @@ void ofApp::draw() {
 }
 
 void ofApp::keyPressed(int key) {
-    static const std::array<float, 6> kKaleidoModes = {0.0f, 4.0f, 6.0f, 8.0f, 10.0f, 12.0f};
-    static const std::array<float, 4> kHalftoneModes = {0.0f, 10.0f, 14.0f, 22.0f};
     static const std::array<int, 3> kWooferModes = {0, 1, 1};
+    if (key == 'K' || (key == 'k' && ofGetKeyPressed(OF_KEY_SHIFT))) {
+        midi.beginLearnKaleido();
+        return;
+    }
+    if (key == 'D' || (key == 'd' && ofGetKeyPressed(OF_KEY_SHIFT))) {
+        midi.beginLearnHalftone();
+        return;
+    }
     if (key == 'f') {
         ofToggleFullscreen();
     } else if (key == 'r') {
@@ -285,9 +321,7 @@ void ofApp::keyPressed(int key) {
         resetBackgroundSubtractor();
         printSettings();
     } else if (key == 'k') {
-        kaleidoModeIndex = (kaleidoModeIndex + 1) % static_cast<int>(kKaleidoModes.size());
-        kaleidoSegments = kKaleidoModes[static_cast<size_t>(kaleidoModeIndex)];
-        enableKaleido = kaleidoSegments > 0.5f;
+        cycleKaleidoMode();
         printSettings();
     } else if (key == 'c') {
         enableTrail = !enableTrail;
@@ -306,6 +340,10 @@ void ofApp::keyPressed(int key) {
             halftoneScale = nextScale;
         }
         printSettings();
+    } else if (key == 'p') {
+        midi.cyclePort();
+    } else if (key == 'o') {
+        midi.toggleOutputTest();
     } else if (key == '+') {
         maskThreshold = std::min(255, maskThreshold + 5);
         printSettings();
@@ -348,6 +386,7 @@ void ofApp::exit() {
     if (grabber.isInitialized()) {
         grabber.close();
     }
+    midi.close();
 }
 
 void ofApp::listCameras() {
@@ -504,6 +543,12 @@ void ofApp::drawTextureCover(ofTexture &tex, float dstW, float dstH, bool mirror
     if (mirrorX) {
         ofPopMatrix();
     }
+}
+
+void ofApp::cycleKaleidoMode() {
+    kaleidoModeIndex = (kaleidoModeIndex + 1) % static_cast<int>(kKaleidoModes.size());
+    kaleidoSegments = kKaleidoModes[static_cast<size_t>(kaleidoModeIndex)];
+    enableKaleido = kaleidoSegments > 0.5f;
 }
 
 void ofApp::updateMotion(const ofPixels &camPixels) {
