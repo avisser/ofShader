@@ -32,6 +32,7 @@ uniform vec2 texSize;
 uniform float halftoneOn;
 uniform float halftoneScale;
 uniform float halftoneEdge;
+uniform float wetMix;
 
 in vec2 vTexCoord;
 out vec4 outputColor;
@@ -67,6 +68,7 @@ void main() {
     float boostedKick = min(1.0, kick * pulseHueBoost);
     float pulse = 1.0 + (pulseAmount * boostedKick);
 
+    vec2 rawCoord = vTexCoord;
     vec2 coord = vTexCoord;
     if (kaleidoOn > 0.5) {
         vec2 center = texSize * 0.5;
@@ -94,8 +96,10 @@ void main() {
     }
 
     coord = clamp(coord, vec2(0.0), texSize - 1.0);
+    rawCoord = clamp(rawCoord, vec2(0.0), texSize - 1.0);
 
     vec3 rgb = texture(tex0, coord).rgb;
+    vec3 rawColor = texture(tex0, rawCoord).rgb;
     float dotMask = 1.0;
     if (halftoneOn > 0.5) {
         float cell = max(2.0, halftoneScale);
@@ -149,8 +153,13 @@ void main() {
     }
     color = clamp(color, 0.0, 1.0);
 
-    color *= dotMask;
-    outputColor = vec4(color * alpha, alpha * dotMask);
+    float mixAmount = clamp(wetMix, 0.0, 1.0);
+    float processedAlpha = alpha * dotMask;
+    vec3 processedColor = color * dotMask;
+    vec3 processedPremul = processedColor * alpha;
+    vec3 outColor = mix(rawColor, processedPremul, mixAmount);
+    float outAlpha = mix(1.0, processedAlpha, mixAmount);
+    outputColor = vec4(outColor, outAlpha);
 }
 )";
     return kFragment;

@@ -121,6 +121,7 @@ private:
     bool enableSaturation = false;
     float saturationScale = 1.0f;
     std::vector<ControlSpec> controls;
+    float wetMix = 0.6f;
     float beatFlashSeconds = 0.12f;
     float beatDotRadius = 10.0f;
     float beatDownbeatRadius = 20.0f;

@@ -13,6 +13,7 @@ constexpr std::array<float, 4> kHalftoneModes = {0.0f, 10.0f, 14.0f, 22.0f};
 constexpr std::array<float, 5> kSaturationModes = {-1.0f, 0.2f, 0.45f, 0.7f, 0.9f};
 constexpr std::array<float, 3> kKaleidoZoomModes = {0.9f, 0.7f, 0.5f};
 constexpr std::array<float, 4> kTempoPresets = {60.0f, 80.0f, 100.0f, 120.0f};
+constexpr std::array<float, 4> kWetMixPresets = {0.2f, 0.4f, 0.6f, 0.8f};
 }
 
 ofApp::ofApp(const AppConfig &config)
@@ -131,6 +132,7 @@ void ofApp::draw() {
         keyShader.setUniform1f("halftoneOn", enableHalftone ? 1.0f : 0.0f);
         keyShader.setUniform1f("halftoneScale", halftoneScale);
         keyShader.setUniform1f("halftoneEdge", halftoneEdge);
+        keyShader.setUniform1f("wetMix", wetMix);
         drawTextureCover(grabber.getTexture(), ofGetWidth(), ofGetHeight(), true);
         keyShader.end();
     } else if (compositeReady) {
@@ -467,6 +469,17 @@ void ofApp::setupControls() {
         0
     });
 
+    addControl({
+        "wetMix",
+        'w',
+        'W',
+        std::vector<float>(kWetMixPresets.begin(), kWetMixPresets.end()),
+        0.0f,
+        1.0f,
+        false,
+        2
+    });
+
     for (const auto &control : controls) {
         applyControl(control);
     }
@@ -577,6 +590,10 @@ void ofApp::applyControl(const ControlSpec &control) {
     if (control.id == "saturation") {
         saturationScale = control.value;
         enableSaturation = control.enabled;
+        return;
+    }
+    if (control.id == "wetMix") {
+        wetMix = control.value;
         return;
     }
 }
@@ -745,7 +762,8 @@ void ofApp::printSettings() {
                       << " spin=" << kaleidoSpin
                       << " zoom=" << kaleidoZoom
                       << " halftone=" << (enableHalftone ? "on" : "off")
-                      << " dots=" << halftoneScale;
+                      << " dots=" << halftoneScale
+                      << " wet=" << wetMix;
     } else {
         ofLogNotice() << "BG: threshold=" << maskThreshold
                       << " morph=" << (enableMorph ? "on" : "off")

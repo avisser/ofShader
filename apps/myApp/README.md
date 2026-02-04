@@ -8,7 +8,7 @@
 - **Draw**:
   - Background image (`bg.jpg`) or a flat gray fallback.
   - Foreground:
-    - **Shader mode** (`1`): webcam texture → optional kaleidoscope/halftone → woofer distortion (beat‑synced) → HSV key → posterize + edge boost → optional hue‑pulse → optional saturation → alpha output.
+    - **Shader mode** (`1`): webcam texture → optional kaleidoscope/halftone → woofer distortion (beat‑synced) → HSV key → posterize + edge boost → optional hue‑pulse → optional saturation → wet/dry mix → alpha output.
     - **BG‑sub mode** (`2`): composited RGBA mask from MOG2.
   - Paint trail overlay (toggle `c`).
 
@@ -25,6 +25,8 @@
 - `Shift+V` Enter MIDI learn mode for saturation (first pad/knob binds).
 - `t` Cycle tempo (60 → 80 → 100 → 120).
 - `Shift+T` Enter MIDI learn mode for tempo (first pad/knob binds).
+- `w` Cycle wet mix presets (0.2 → 0.4 → 0.6 → 0.8).
+- `Shift+W` Enter MIDI learn mode for wet mix (first pad/knob binds).
 - `c` Toggle paint trail.
 - `b` Cycle woofer distortion (off → on → on → off).
 - `p` Cycle MIDI input ports.
@@ -41,6 +43,7 @@
 - Green key: `keyHueDeg`, `keyHueRangeDeg`, `keyMinSat`, `keyMinVal`
 - Stylize: `posterizeLevels`, `edgeStrength`
 - Saturation: `saturationScale`
+- Wet mix: `wetMix` (0 = raw camera, 1 = fully processed)
 - Kaleidoscope: `kaleidoSegments`, `kaleidoSpin`
 - Kaleidoscope framing: `kaleidoZoom` (lower = use more center)
 - Halftone: `halftoneScale`, `halftoneEdge`
@@ -65,4 +68,7 @@
 - Learn tempo: press `Shift+T`, then move a knob (CC flood) or hit a pad (NoteOn).
 - Tempo pad: cycles tempo presets.
 - Tempo knob: sets BPM continuously (60 → 120).
+- Learn wet mix: press `Shift+W`, then move a knob (CC flood) or hit a pad (NoteOn).
+- Wet mix pad: cycles 20/40/60/80% wet.
+- Wet mix knob: sets wet continuously (0 → 100%).
 - Settings are persisted to `bin/data/settings.yaml` and loaded on startup. The device name is matched against available MIDI ports; a warning is logged if no match is found.
