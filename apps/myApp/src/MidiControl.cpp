@@ -65,6 +65,13 @@ void MidiControl::beginLearnKaleido() {
     ofLogNotice() << "MIDI learn (kaleido): waiting for pad or knob input.";
 }
 
+void MidiControl::beginLearnKaleidoZoom() {
+    learn = LearnState{};
+    learn.active = true;
+    learn.target = LearnTarget::KaleidoZoom;
+    ofLogNotice() << "MIDI learn (kaleido zoom): waiting for pad or knob input.";
+}
+
 void MidiControl::beginLearnHalftone() {
     learn = LearnState{};
     learn.active = true;
@@ -83,6 +90,10 @@ bool MidiControl::isLearningKaleido() const {
     return learn.active && learn.target == LearnTarget::Kaleido;
 }
 
+bool MidiControl::isLearningKaleidoZoom() const {
+    return learn.active && learn.target == LearnTarget::KaleidoZoom;
+}
+
 bool MidiControl::isLearningHalftone() const {
     return learn.active && learn.target == LearnTarget::Halftone;
 }
@@ -96,6 +107,14 @@ bool MidiControl::consumeKaleidoPadHit() {
         return false;
     }
     kaleidoBinding.padHit = false;
+    return true;
+}
+
+bool MidiControl::consumeKaleidoZoomPadHit() {
+    if (!kaleidoZoomBinding.padHit) {
+        return false;
+    }
+    kaleidoZoomBinding.padHit = false;
     return true;
 }
 
@@ -119,6 +138,10 @@ bool MidiControl::hasKaleidoKnobBinding() const {
     return kaleidoBinding.knob.valid();
 }
 
+bool MidiControl::hasKaleidoZoomKnobBinding() const {
+    return kaleidoZoomBinding.knob.valid();
+}
+
 bool MidiControl::hasHalftoneKnobBinding() const {
     return halftoneBinding.knob.valid();
 }
@@ -133,6 +156,15 @@ bool MidiControl::consumeKaleidoKnobValue(float &outValue01) {
     }
     kaleidoBinding.knobUpdated = false;
     outValue01 = kaleidoBinding.knob.value01;
+    return true;
+}
+
+bool MidiControl::consumeKaleidoZoomKnobValue(float &outValue01) {
+    if (!kaleidoZoomBinding.knobUpdated) {
+        return false;
+    }
+    kaleidoZoomBinding.knobUpdated = false;
+    outValue01 = kaleidoZoomBinding.knob.value01;
     return true;
 }
 
@@ -185,6 +217,12 @@ void MidiControl::processMessage(const ofxMidiMessage &message) {
         }
     }
 
+    if (kaleidoZoomBinding.pad.valid() && message.status == MIDI_NOTE_ON && message.velocity > 0) {
+        if (message.channel == kaleidoZoomBinding.pad.channel && message.pitch == kaleidoZoomBinding.pad.note) {
+            kaleidoZoomBinding.padHit = true;
+        }
+    }
+
     if (halftoneBinding.pad.valid() && message.status == MIDI_NOTE_ON && message.velocity > 0) {
         if (message.channel == halftoneBinding.pad.channel && message.pitch == halftoneBinding.pad.note) {
             halftoneBinding.padHit = true;
@@ -203,6 +241,16 @@ void MidiControl::processMessage(const ofxMidiMessage &message) {
             if (std::abs(value01 - kaleidoBinding.knob.value01) > 0.0005f) {
                 kaleidoBinding.knob.value01 = value01;
                 kaleidoBinding.knobUpdated = true;
+            }
+        }
+    }
+
+    if (kaleidoZoomBinding.knob.valid() && message.status == MIDI_CONTROL_CHANGE) {
+        if (message.channel == kaleidoZoomBinding.knob.channel && message.control == kaleidoZoomBinding.knob.control) {
+            float value01 = ofClamp(message.value / 127.0f, 0.0f, 1.0f);
+            if (std::abs(value01 - kaleidoZoomBinding.knob.value01) > 0.0005f) {
+                kaleidoZoomBinding.knob.value01 = value01;
+                kaleidoZoomBinding.knobUpdated = true;
             }
         }
     }
@@ -251,6 +299,9 @@ void MidiControl::finalizeLearning() {
     if (learn.target == LearnTarget::Kaleido) {
         binding = &kaleidoBinding;
         targetName = "kaleido";
+    } else if (learn.target == LearnTarget::KaleidoZoom) {
+        binding = &kaleidoZoomBinding;
+        targetName = "kaleidoZoom";
     } else if (learn.target == LearnTarget::Halftone) {
         binding = &halftoneBinding;
         targetName = "halftone";
@@ -523,6 +574,7 @@ void MidiControl::saveSettings() {
         out << "  - name: \"" << device.name << "\"\n";
         out << "    bindings:\n";
         writeBinding(out, "kaleido", device.kaleido.pad, device.kaleido.knob);
+        writeBinding(out, "kaleidoZoom", device.kaleidoZoom.pad, device.kaleidoZoom.knob);
         writeBinding(out, "halftone", device.halftone.pad, device.halftone.knob);
         writeBinding(out, "saturation", device.saturation.pad, device.saturation.knob);
     }
@@ -544,6 +596,7 @@ bool MidiControl::applySettingsForAvailableDevice() {
         if (portIndex >= 0) {
             openPort(portIndex);
             kaleidoBinding = device.kaleido;
+            kaleidoZoomBinding = device.kaleidoZoom;
             halftoneBinding = device.halftone;
             saturationBinding = device.saturation;
             ofLogNotice() << "MIDI settings: loaded bindings for device \""
@@ -584,6 +637,9 @@ MidiControl::Binding *MidiControl::bindingForTarget(DeviceSettings &device, cons
     if (target == "kaleido") {
         return &device.kaleido;
     }
+    if (target == "kaleidoZoom") {
+        return &device.kaleidoZoom;
+    }
     if (target == "halftone") {
         return &device.halftone;
     }
@@ -602,15 +658,19 @@ MidiControl::DeviceSettings MidiControl::buildCurrentDeviceSettings() {
         device.name = midiIn.getInPortName(currentPort);
     }
     device.kaleido = kaleidoBinding;
+    device.kaleidoZoom = kaleidoZoomBinding;
     device.halftone = halftoneBinding;
     device.saturation = saturationBinding;
     device.kaleido.padHit = false;
+    device.kaleidoZoom.padHit = false;
     device.halftone.padHit = false;
     device.saturation.padHit = false;
     device.kaleido.knobUpdated = false;
+    device.kaleidoZoom.knobUpdated = false;
     device.halftone.knobUpdated = false;
     device.saturation.knobUpdated = false;
     device.kaleido.knob.value01 = 0.0f;
+    device.kaleidoZoom.knob.value01 = 0.0f;
     device.halftone.knob.value01 = 0.0f;
     device.saturation.knob.value01 = 0.0f;
     return device;

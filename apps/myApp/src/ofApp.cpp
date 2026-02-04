@@ -11,6 +11,8 @@ namespace {
 constexpr std::array<float, 6> kKaleidoModes = {0.0f, 4.0f, 6.0f, 8.0f, 10.0f, 12.0f};
 constexpr std::array<float, 4> kHalftoneModes = {0.0f, 10.0f, 14.0f, 22.0f};
 constexpr std::array<float, 5> kSaturationModes = {-1.0f, 0.2f, 0.45f, 0.7f, 0.9f};
+constexpr std::array<float, 3> kKaleidoZoomModes = {0.9f, 0.7f, 0.5f};
+constexpr std::array<float, 4> kTempoPresets = {60.0f, 80.0f, 100.0f, 120.0f};
 }
 
 ofApp::ofApp(const AppConfig &config)
@@ -83,10 +85,19 @@ void ofApp::update() {
         cycleKaleidoMode();
         printSettings();
     }
+    if (midi.consumeKaleidoZoomPadHit()) {
+        kaleidoZoomModeIndex = (kaleidoZoomModeIndex + 1) % static_cast<int>(kKaleidoZoomModes.size());
+        kaleidoZoom = kKaleidoZoomModes[static_cast<size_t>(kaleidoZoomModeIndex)];
+        printSettings();
+    }
     float midiValue = 0.0f;
     if (midi.consumeKaleidoKnobValue(midiValue)) {
         kaleidoSegments = ofClamp(midiValue, 0.0f, 1.0f) * 16.0f;
         enableKaleido = kaleidoSegments > 0.5f;
+    }
+    if (midi.consumeKaleidoZoomKnobValue(midiValue)) {
+        float value01 = ofClamp(midiValue, 0.0f, 1.0f);
+        kaleidoZoom = ofLerp(kaleidoZoomKnobMax, kaleidoZoomKnobMin, value01);
     }
     if (midi.consumeHalftonePadHit()) {
         halftoneModeIndex = (halftoneModeIndex + 1) % static_cast<int>(kHalftoneModes.size());
@@ -163,6 +174,7 @@ void ofApp::draw() {
         keyShader.setUniform1f("kaleidoOn", enableKaleido ? 1.0f : 0.0f);
         keyShader.setUniform1f("kaleidoSegments", kaleidoSegments);
         keyShader.setUniform1f("kaleidoSpin", kaleidoSpin);
+        keyShader.setUniform1f("kaleidoZoom", kaleidoZoom);
         keyShader.setUniform1f("halftoneOn", enableHalftone ? 1.0f : 0.0f);
         keyShader.setUniform1f("halftoneScale", halftoneScale);
         keyShader.setUniform1f("halftoneEdge", halftoneEdge);
@@ -175,12 +187,31 @@ void ofApp::draw() {
     if (enableTrail) {
         drawTrail();
     }
+
+    float beatsPerSecond = pulseBpm / 60.0f;
+    if (beatsPerSecond > 0.0f) {
+        float beatTime = ofGetElapsedTimef() * beatsPerSecond;
+        float beatPhase = beatTime - std::floor(beatTime);
+        float flashBeats = beatFlashSeconds * beatsPerSecond;
+        if (beatPhase < flashBeats) {
+            int beatIndex = static_cast<int>(std::floor(beatTime)) % 4;
+            float radius = (beatIndex == 0) ? beatDownbeatRadius : beatDotRadius;
+            ofPushStyle();
+            ofSetColor(0);
+            ofDrawCircle(20.0f, 20.0f, radius);
+            ofPopStyle();
+        }
+    }
 }
 
 void ofApp::keyPressed(int key) {
     static const std::array<int, 3> kWooferModes = {0, 1, 1};
     if (key == 'K' || (key == 'k' && ofGetKeyPressed(OF_KEY_SHIFT))) {
         midi.beginLearnKaleido();
+        return;
+    }
+    if (key == 'Z' || (key == 'z' && ofGetKeyPressed(OF_KEY_SHIFT))) {
+        midi.beginLearnKaleidoZoom();
         return;
     }
     if (key == 'D' || (key == 'd' && ofGetKeyPressed(OF_KEY_SHIFT))) {
@@ -205,6 +236,10 @@ void ofApp::keyPressed(int key) {
         printSettings();
     } else if (key == 'k') {
         cycleKaleidoMode();
+        printSettings();
+    } else if (key == 'z') {
+        kaleidoZoomModeIndex = (kaleidoZoomModeIndex + 1) % static_cast<int>(kKaleidoZoomModes.size());
+        kaleidoZoom = kKaleidoZoomModes[static_cast<size_t>(kaleidoZoomModeIndex)];
         printSettings();
     } else if (key == 'c') {
         enableTrail = !enableTrail;
@@ -233,6 +268,10 @@ void ofApp::keyPressed(int key) {
             enableSaturation = true;
             saturationScale = mode;
         }
+        printSettings();
+    } else if (key == 't') {
+        tempoIndex = (tempoIndex + 1) % static_cast<int>(kTempoPresets.size());
+        pulseBpm = kTempoPresets[static_cast<size_t>(tempoIndex)];
         printSettings();
     } else if (key == 'p') {
         midi.cyclePort();
@@ -607,6 +646,7 @@ void ofApp::printSettings() {
                       << " kaleido=" << (enableKaleido ? "on" : "off")
                       << " segments=" << kaleidoSegments
                       << " spin=" << kaleidoSpin
+                      << " zoom=" << kaleidoZoom
                       << " halftone=" << (enableHalftone ? "on" : "off")
                       << " dots=" << halftoneScale;
     } else {

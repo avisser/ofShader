@@ -74,7 +74,7 @@ private:
     float keyMinVal = 0.2f;
     float posterizeLevels = 6.0f;
     float edgeStrength = 1.1f;
-    float pulseBpm = 110.0f;
+    float pulseBpm = 60.0f;
     float pulseAmount = 0.0f;
     float pulseColorize = 0.0f;
     float pulseHueShiftDeg = 18.0f;
@@ -89,8 +89,11 @@ private:
     bool enableKaleido = true;
     float kaleidoSegments = 6.0f;
     float kaleidoSpin = 0.0f;
-    
+    float kaleidoZoom = 0.7f;
     int kaleidoModeIndex = 2;
+    int kaleidoZoomModeIndex = 0;
+    float kaleidoZoomKnobMin = 0.3f;
+    float kaleidoZoomKnobMax = 1.0f;
     bool enableHalftone = false;
     float halftoneScale = 14.0f;
     float halftoneEdge = 0.3f;
@@ -101,6 +104,11 @@ private:
     bool enableSaturation = false;
     float saturationScale = 1.0f;
     int saturationModeIndex = 0;
+
+    int tempoIndex = 0;
+    float beatFlashSeconds = 0.12f;
+    float beatDotRadius = 10.0f;
+    float beatDownbeatRadius = 20.0f;
 
     bool enableTrail = true;
     ofFbo trailFbo;

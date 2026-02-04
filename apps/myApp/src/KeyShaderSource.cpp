@@ -27,6 +27,7 @@ uniform float satScale;
 uniform float kaleidoOn;
 uniform float kaleidoSegments;
 uniform float kaleidoSpin;
+uniform float kaleidoZoom;
 uniform vec2 texSize;
 uniform float halftoneOn;
 uniform float halftoneScale;
@@ -70,6 +71,8 @@ void main() {
     if (kaleidoOn > 0.5) {
         vec2 center = texSize * 0.5;
         vec2 p = coord - center;
+        float zoom = clamp(kaleidoZoom, 0.1, 1.0);
+        p *= zoom;
         float r = length(p);
         float angle = atan(p.y, p.x) + kaleidoSpin * time;
         float segments = max(1.0, kaleidoSegments);

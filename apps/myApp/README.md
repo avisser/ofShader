@@ -17,10 +17,13 @@
 - `2` Background subtractor mode (OpenCV MOG2).
 - `k` Cycle kaleidoscope modes (off → 4 → 6 → 8 → 10 → 12 → off).
 - `Shift+K` Enter MIDI learn mode for kaleidoscope (first pad/knob binds).
+- `z` Cycle kaleidoscope zoom (0.9 → 0.7 → 0.5).
+- `Shift+Z` Enter MIDI learn mode for kaleidoscope zoom (first pad/knob binds).
 - `d` Cycle halftone dots (off → fine → medium → coarse → off).
 - `Shift+D` Enter MIDI learn mode for halftone (first pad/knob binds).
 - `v` Cycle saturation presets (off → 0.2 → 0.45 → 0.7 → 0.9 → off).
 - `Shift+V` Enter MIDI learn mode for saturation (first pad/knob binds).
+- `t` Cycle tempo (60 → 80 → 100 → 120).
 - `c` Toggle paint trail.
 - `b` Cycle woofer distortion (off → on → on → off).
 - `p` Cycle MIDI input ports.
@@ -38,6 +41,7 @@
 - Stylize: `posterizeLevels`, `edgeStrength`
 - Saturation: `saturationScale`
 - Kaleidoscope: `kaleidoSegments`, `kaleidoSpin`
+- Kaleidoscope framing: `kaleidoZoom` (lower = use more center)
 - Halftone: `halftoneScale`, `halftoneEdge`
 - Hue pulse: `pulseBpm`, `pulseHueShiftDeg`
 - Woofer: `wooferStrength`, `wooferFalloff`
@@ -48,6 +52,9 @@
 - Learn: press `Shift+K`, then move a knob (CC flood) or hit a pad (NoteOn).
 - Pad binding: cycles kaleidoscope modes.
 - Knob binding: sets `kaleidoSegments` continuously (0..16), overriding the cycle.
+- Learn kaleido zoom: press `Shift+Z`, then move a knob (CC flood) or hit a pad (NoteOn).
+- Kaleido zoom pad: cycles zoom presets.
+- Kaleido zoom knob: sets zoom continuously (1.0 → 0.3).
 - Learn halftone: press `Shift+D`, then move a knob (CC flood) or hit a pad (NoteOn).
 - Halftone pad: cycles the 4 presets.
 - Halftone knob: sets `halftoneScale` continuously (wider range than presets).

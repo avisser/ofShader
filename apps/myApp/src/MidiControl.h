@@ -17,19 +17,24 @@ public:
     void toggleOutputTest();
 
     void beginLearnKaleido();
+    void beginLearnKaleidoZoom();
     void beginLearnHalftone();
     void beginLearnSaturation();
     bool isLearningKaleido() const;
+    bool isLearningKaleidoZoom() const;
     bool isLearningHalftone() const;
     bool isLearningSaturation() const;
 
     bool consumeKaleidoPadHit();
+    bool consumeKaleidoZoomPadHit();
     bool consumeHalftonePadHit();
     bool consumeSaturationPadHit();
     bool hasKaleidoKnobBinding() const;
+    bool hasKaleidoZoomKnobBinding() const;
     bool hasHalftoneKnobBinding() const;
     bool hasSaturationKnobBinding() const;
     bool consumeKaleidoKnobValue(float &outValue01);
+    bool consumeKaleidoZoomKnobValue(float &outValue01);
     bool consumeHalftoneKnobValue(float &outValue01);
     bool consumeSaturationKnobValue(float &outValue01);
 
@@ -38,6 +43,7 @@ public:
 private:
     enum class LearnTarget {
         Kaleido,
+        KaleidoZoom,
         Halftone,
         Saturation
     };
@@ -65,6 +71,7 @@ private:
     struct DeviceSettings {
         std::string name;
         Binding kaleido;
+        Binding kaleidoZoom;
         Binding halftone;
         Binding saturation;
     };
@@ -124,6 +131,7 @@ private:
 
     LearnState learn;
     Binding kaleidoBinding;
+    Binding kaleidoZoomBinding;
     Binding halftoneBinding;
     Binding saturationBinding;
 };
