@@ -16,22 +16,28 @@ public:
 
     void beginLearnKaleido();
     void beginLearnHalftone();
+    void beginLearnSaturation();
     bool isLearningKaleido() const;
     bool isLearningHalftone() const;
+    bool isLearningSaturation() const;
 
     bool consumeKaleidoPadHit();
     bool consumeHalftonePadHit();
+    bool consumeSaturationPadHit();
     bool hasKaleidoKnobBinding() const;
     bool hasHalftoneKnobBinding() const;
+    bool hasSaturationKnobBinding() const;
     float getKaleidoKnobValue01() const;
     float getHalftoneKnobValue01() const;
+    float getSaturationKnobValue01() const;
 
     void newMidiMessage(ofxMidiMessage &message) override;
 
 private:
     enum class LearnTarget {
         Kaleido,
-        Halftone
+        Halftone,
+        Saturation
     };
 
     struct PadBinding {
@@ -93,4 +99,5 @@ private:
     LearnState learn;
     Binding kaleidoBinding;
     Binding halftoneBinding;
+    Binding saturationBinding;
 };

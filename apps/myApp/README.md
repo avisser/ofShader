@@ -8,7 +8,7 @@
 - **Draw**:
   - Background image (`bg.jpg`) or a flat gray fallback.
   - Foreground:
-    - **Shader mode** (`1`): webcam texture → optional kaleidoscope/halftone → woofer distortion (beat‑synced) → HSV key → posterize + edge boost → optional hue‑pulse → alpha output.
+    - **Shader mode** (`1`): webcam texture → optional kaleidoscope/halftone → woofer distortion (beat‑synced) → HSV key → posterize + edge boost → optional hue‑pulse → optional saturation → alpha output.
     - **BG‑sub mode** (`2`): composited RGBA mask from MOG2.
   - Paint trail overlay (toggle `c`).
 
@@ -19,6 +19,8 @@
 - `Shift+K` Enter MIDI learn mode for kaleidoscope (first pad/knob binds).
 - `d` Cycle halftone dots (off → fine → medium → coarse → off).
 - `Shift+D` Enter MIDI learn mode for halftone (first pad/knob binds).
+- `v` Cycle saturation presets (off → 0.2 → 0.45 → 0.7 → 0.9 → off).
+- `Shift+V` Enter MIDI learn mode for saturation (first pad/knob binds).
 - `c` Toggle paint trail.
 - `b` Cycle woofer distortion (off → on → on → off).
 - `p` Cycle MIDI input ports.
@@ -34,6 +36,7 @@
 ## Handy Tweaks (in `src/ofApp.h`)
 - Green key: `keyHueDeg`, `keyHueRangeDeg`, `keyMinSat`, `keyMinVal`
 - Stylize: `posterizeLevels`, `edgeStrength`
+- Saturation: `saturationScale`
 - Kaleidoscope: `kaleidoSegments`, `kaleidoSpin`
 - Halftone: `halftoneScale`, `halftoneEdge`
 - Hue pulse: `pulseBpm`, `pulseHueShiftDeg`
@@ -48,3 +51,6 @@
 - Learn halftone: press `Shift+D`, then move a knob (CC flood) or hit a pad (NoteOn).
 - Halftone pad: cycles the 4 presets.
 - Halftone knob: sets `halftoneScale` continuously (wider range than presets).
+- Learn saturation: press `Shift+V`, then move a knob (CC flood) or hit a pad (NoteOn).
+- Saturation pad: cycles the 4 presets plus off.
+- Saturation knob: sets saturation continuously (0 = B/W, 1 = full color).

@@ -98,6 +98,10 @@ private:
     float halftoneKnobMin = 6.0f;
     float halftoneKnobMax = 30.0f;
 
+    bool enableSaturation = false;
+    float saturationScale = 1.0f;
+    int saturationModeIndex = 0;
+
     bool enableTrail = true;
     ofFbo trailFbo;
     float trailFade = 0.04f;

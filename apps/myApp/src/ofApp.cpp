@@ -9,6 +9,7 @@
 namespace {
 constexpr std::array<float, 6> kKaleidoModes = {0.0f, 4.0f, 6.0f, 8.0f, 10.0f, 12.0f};
 constexpr std::array<float, 4> kHalftoneModes = {0.0f, 10.0f, 14.0f, 22.0f};
+constexpr std::array<float, 5> kSaturationModes = {-1.0f, 0.2f, 0.45f, 0.7f, 0.9f};
 }
 
 ofApp::ofApp(const AppConfig &config)
@@ -76,6 +77,8 @@ uniform float pulseHueBoost;
 uniform float wooferOn;
 uniform float wooferStrength;
 uniform float wooferFalloff;
+uniform float satOn;
+uniform float satScale;
 uniform float kaleidoOn;
 uniform float kaleidoSegments;
 uniform float kaleidoSpin;
@@ -191,6 +194,11 @@ void main() {
         }
         color = hsv2rgb(hsvOut);
     }
+    if (satOn > 0.5) {
+        vec3 hsvSat = rgb2hsv(color);
+        hsvSat.y = clamp(hsvSat.y * satScale, 0.0, 1.0);
+        color = hsv2rgb(hsvSat);
+    }
     color = clamp(color, 0.0, 1.0);
 
     color *= dotMask;
@@ -242,6 +250,23 @@ void ofApp::update() {
         halftoneScale = ofLerp(halftoneKnobMin, halftoneKnobMax, value01);
         enableHalftone = halftoneScale > 0.5f;
     }
+    if (midi.consumeSaturationPadHit()) {
+        saturationModeIndex = (saturationModeIndex + 1) % static_cast<int>(kSaturationModes.size());
+        float mode = kSaturationModes[static_cast<size_t>(saturationModeIndex)];
+        if (mode < 0.0f) {
+            enableSaturation = false;
+            saturationScale = 1.0f;
+        } else {
+            enableSaturation = true;
+            saturationScale = mode;
+        }
+        printSettings();
+    }
+    if (midi.hasSaturationKnobBinding()) {
+        float value01 = ofClamp(midi.getSaturationKnobValue01(), 0.0f, 1.0f);
+        enableSaturation = true;
+        saturationScale = value01;
+    }
 
     updateTrail(ofGetLastFrameTime());
 }
@@ -281,6 +306,8 @@ void ofApp::draw() {
         keyShader.setUniform1f("wooferOn", enableWoofer ? 1.0f : 0.0f);
         keyShader.setUniform1f("wooferStrength", wooferStrength);
         keyShader.setUniform1f("wooferFalloff", wooferFalloff);
+        keyShader.setUniform1f("satOn", enableSaturation ? 1.0f : 0.0f);
+        keyShader.setUniform1f("satScale", saturationScale);
         keyShader.setUniform1f("kaleidoOn", enableKaleido ? 1.0f : 0.0f);
         keyShader.setUniform1f("kaleidoSegments", kaleidoSegments);
         keyShader.setUniform1f("kaleidoSpin", kaleidoSpin);
@@ -306,6 +333,10 @@ void ofApp::keyPressed(int key) {
     }
     if (key == 'D' || (key == 'd' && ofGetKeyPressed(OF_KEY_SHIFT))) {
         midi.beginLearnHalftone();
+        return;
+    }
+    if (key == 'V' || (key == 'v' && ofGetKeyPressed(OF_KEY_SHIFT))) {
+        midi.beginLearnSaturation();
         return;
     }
     if (key == 'f') {
@@ -338,6 +369,17 @@ void ofApp::keyPressed(int key) {
         enableHalftone = nextScale > 0.5f;
         if (enableHalftone) {
             halftoneScale = nextScale;
+        }
+        printSettings();
+    } else if (key == 'v') {
+        saturationModeIndex = (saturationModeIndex + 1) % static_cast<int>(kSaturationModes.size());
+        float mode = kSaturationModes[static_cast<size_t>(saturationModeIndex)];
+        if (mode < 0.0f) {
+            enableSaturation = false;
+            saturationScale = 1.0f;
+        } else {
+            enableSaturation = true;
+            saturationScale = mode;
         }
         printSettings();
     } else if (key == 'p') {
@@ -708,6 +750,8 @@ void ofApp::printSettings() {
                       << " minVal=" << keyMinVal
                       << " posterize=" << posterizeLevels
                       << " edge=" << edgeStrength
+                      << " sat=" << (enableSaturation ? "on" : "off")
+                      << " satScale=" << saturationScale
                       << " kaleido=" << (enableKaleido ? "on" : "off")
                       << " segments=" << kaleidoSegments
                       << " spin=" << kaleidoSpin

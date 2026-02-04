@@ -63,12 +63,23 @@ void MidiControl::beginLearnHalftone() {
     ofLogNotice() << "MIDI learn (halftone): waiting for pad or knob input.";
 }
 
+void MidiControl::beginLearnSaturation() {
+    learn = LearnState{};
+    learn.active = true;
+    learn.target = LearnTarget::Saturation;
+    ofLogNotice() << "MIDI learn (saturation): waiting for pad or knob input.";
+}
+
 bool MidiControl::isLearningKaleido() const {
     return learn.active && learn.target == LearnTarget::Kaleido;
 }
 
 bool MidiControl::isLearningHalftone() const {
     return learn.active && learn.target == LearnTarget::Halftone;
+}
+
+bool MidiControl::isLearningSaturation() const {
+    return learn.active && learn.target == LearnTarget::Saturation;
 }
 
 bool MidiControl::consumeKaleidoPadHit() {
@@ -87,6 +98,14 @@ bool MidiControl::consumeHalftonePadHit() {
     return true;
 }
 
+bool MidiControl::consumeSaturationPadHit() {
+    if (!saturationBinding.padHit) {
+        return false;
+    }
+    saturationBinding.padHit = false;
+    return true;
+}
+
 bool MidiControl::hasKaleidoKnobBinding() const {
     return kaleidoBinding.knob.valid();
 }
@@ -95,12 +114,20 @@ bool MidiControl::hasHalftoneKnobBinding() const {
     return halftoneBinding.knob.valid();
 }
 
+bool MidiControl::hasSaturationKnobBinding() const {
+    return saturationBinding.knob.valid();
+}
+
 float MidiControl::getKaleidoKnobValue01() const {
     return kaleidoBinding.knob.value01;
 }
 
 float MidiControl::getHalftoneKnobValue01() const {
     return halftoneBinding.knob.value01;
+}
+
+float MidiControl::getSaturationKnobValue01() const {
+    return saturationBinding.knob.value01;
 }
 
 void MidiControl::cyclePort() {
@@ -139,6 +166,12 @@ void MidiControl::processMessage(const ofxMidiMessage &message) {
         }
     }
 
+    if (saturationBinding.pad.valid() && message.status == MIDI_NOTE_ON && message.velocity > 0) {
+        if (message.channel == saturationBinding.pad.channel && message.pitch == saturationBinding.pad.note) {
+            saturationBinding.padHit = true;
+        }
+    }
+
     if (kaleidoBinding.knob.valid() && message.status == MIDI_CONTROL_CHANGE) {
         if (message.channel == kaleidoBinding.knob.channel && message.control == kaleidoBinding.knob.control) {
             kaleidoBinding.knob.value01 = ofClamp(message.value / 127.0f, 0.0f, 1.0f);
@@ -148,6 +181,12 @@ void MidiControl::processMessage(const ofxMidiMessage &message) {
     if (halftoneBinding.knob.valid() && message.status == MIDI_CONTROL_CHANGE) {
         if (message.channel == halftoneBinding.knob.channel && message.control == halftoneBinding.knob.control) {
             halftoneBinding.knob.value01 = ofClamp(message.value / 127.0f, 0.0f, 1.0f);
+        }
+    }
+
+    if (saturationBinding.knob.valid() && message.status == MIDI_CONTROL_CHANGE) {
+        if (message.channel == saturationBinding.knob.channel && message.control == saturationBinding.knob.control) {
+            saturationBinding.knob.value01 = ofClamp(message.value / 127.0f, 0.0f, 1.0f);
         }
     }
 }
@@ -178,6 +217,9 @@ void MidiControl::finalizeLearning() {
     } else if (learn.target == LearnTarget::Halftone) {
         binding = &halftoneBinding;
         targetName = "halftone";
+    } else if (learn.target == LearnTarget::Saturation) {
+        binding = &saturationBinding;
+        targetName = "saturation";
     }
 
     if (!binding) {
