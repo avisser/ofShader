@@ -232,8 +232,9 @@ void ofApp::update() {
         cycleKaleidoMode();
         printSettings();
     }
-    if (midi.hasKaleidoKnobBinding()) {
-        kaleidoSegments = ofClamp(midi.getKaleidoKnobValue01(), 0.0f, 1.0f) * 16.0f;
+    float midiValue = 0.0f;
+    if (midi.consumeKaleidoKnobValue(midiValue)) {
+        kaleidoSegments = ofClamp(midiValue, 0.0f, 1.0f) * 16.0f;
         enableKaleido = kaleidoSegments > 0.5f;
     }
     if (midi.consumeHalftonePadHit()) {
@@ -245,8 +246,8 @@ void ofApp::update() {
         }
         printSettings();
     }
-    if (midi.hasHalftoneKnobBinding()) {
-        float value01 = ofClamp(midi.getHalftoneKnobValue01(), 0.0f, 1.0f);
+    if (midi.consumeHalftoneKnobValue(midiValue)) {
+        float value01 = ofClamp(midiValue, 0.0f, 1.0f);
         halftoneScale = ofLerp(halftoneKnobMin, halftoneKnobMax, value01);
         enableHalftone = halftoneScale > 0.5f;
     }
@@ -262,8 +263,8 @@ void ofApp::update() {
         }
         printSettings();
     }
-    if (midi.hasSaturationKnobBinding()) {
-        float value01 = ofClamp(midi.getSaturationKnobValue01(), 0.0f, 1.0f);
+    if (midi.consumeSaturationKnobValue(midiValue)) {
+        float value01 = ofClamp(midiValue, 0.0f, 1.0f);
         enableSaturation = true;
         saturationScale = value01;
     }

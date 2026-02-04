@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <sstream>
 
 void MidiControl::setup() {
@@ -126,16 +127,31 @@ bool MidiControl::hasSaturationKnobBinding() const {
     return saturationBinding.knob.valid();
 }
 
-float MidiControl::getKaleidoKnobValue01() const {
-    return kaleidoBinding.knob.value01;
+bool MidiControl::consumeKaleidoKnobValue(float &outValue01) {
+    if (!kaleidoBinding.knobUpdated) {
+        return false;
+    }
+    kaleidoBinding.knobUpdated = false;
+    outValue01 = kaleidoBinding.knob.value01;
+    return true;
 }
 
-float MidiControl::getHalftoneKnobValue01() const {
-    return halftoneBinding.knob.value01;
+bool MidiControl::consumeHalftoneKnobValue(float &outValue01) {
+    if (!halftoneBinding.knobUpdated) {
+        return false;
+    }
+    halftoneBinding.knobUpdated = false;
+    outValue01 = halftoneBinding.knob.value01;
+    return true;
 }
 
-float MidiControl::getSaturationKnobValue01() const {
-    return saturationBinding.knob.value01;
+bool MidiControl::consumeSaturationKnobValue(float &outValue01) {
+    if (!saturationBinding.knobUpdated) {
+        return false;
+    }
+    saturationBinding.knobUpdated = false;
+    outValue01 = saturationBinding.knob.value01;
+    return true;
 }
 
 void MidiControl::cyclePort() {
@@ -182,19 +198,31 @@ void MidiControl::processMessage(const ofxMidiMessage &message) {
 
     if (kaleidoBinding.knob.valid() && message.status == MIDI_CONTROL_CHANGE) {
         if (message.channel == kaleidoBinding.knob.channel && message.control == kaleidoBinding.knob.control) {
-            kaleidoBinding.knob.value01 = ofClamp(message.value / 127.0f, 0.0f, 1.0f);
+            float value01 = ofClamp(message.value / 127.0f, 0.0f, 1.0f);
+            if (std::abs(value01 - kaleidoBinding.knob.value01) > 0.0005f) {
+                kaleidoBinding.knob.value01 = value01;
+                kaleidoBinding.knobUpdated = true;
+            }
         }
     }
 
     if (halftoneBinding.knob.valid() && message.status == MIDI_CONTROL_CHANGE) {
         if (message.channel == halftoneBinding.knob.channel && message.control == halftoneBinding.knob.control) {
-            halftoneBinding.knob.value01 = ofClamp(message.value / 127.0f, 0.0f, 1.0f);
+            float value01 = ofClamp(message.value / 127.0f, 0.0f, 1.0f);
+            if (std::abs(value01 - halftoneBinding.knob.value01) > 0.0005f) {
+                halftoneBinding.knob.value01 = value01;
+                halftoneBinding.knobUpdated = true;
+            }
         }
     }
 
     if (saturationBinding.knob.valid() && message.status == MIDI_CONTROL_CHANGE) {
         if (message.channel == saturationBinding.knob.channel && message.control == saturationBinding.knob.control) {
-            saturationBinding.knob.value01 = ofClamp(message.value / 127.0f, 0.0f, 1.0f);
+            float value01 = ofClamp(message.value / 127.0f, 0.0f, 1.0f);
+            if (std::abs(value01 - saturationBinding.knob.value01) > 0.0005f) {
+                saturationBinding.knob.value01 = value01;
+                saturationBinding.knobUpdated = true;
+            }
         }
     }
 }
@@ -580,6 +608,9 @@ MidiControl::DeviceSettings MidiControl::buildCurrentDeviceSettings() {
     device.kaleido.padHit = false;
     device.halftone.padHit = false;
     device.saturation.padHit = false;
+    device.kaleido.knobUpdated = false;
+    device.halftone.knobUpdated = false;
+    device.saturation.knobUpdated = false;
     device.kaleido.knob.value01 = 0.0f;
     device.halftone.knob.value01 = 0.0f;
     device.saturation.knob.value01 = 0.0f;

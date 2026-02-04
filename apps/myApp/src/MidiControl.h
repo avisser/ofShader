@@ -29,9 +29,9 @@ public:
     bool hasKaleidoKnobBinding() const;
     bool hasHalftoneKnobBinding() const;
     bool hasSaturationKnobBinding() const;
-    float getKaleidoKnobValue01() const;
-    float getHalftoneKnobValue01() const;
-    float getSaturationKnobValue01() const;
+    bool consumeKaleidoKnobValue(float &outValue01);
+    bool consumeHalftoneKnobValue(float &outValue01);
+    bool consumeSaturationKnobValue(float &outValue01);
 
     void newMidiMessage(ofxMidiMessage &message) override;
 
@@ -59,6 +59,7 @@ private:
         PadBinding pad;
         KnobBinding knob;
         bool padHit = false;
+        bool knobUpdated = false;
     };
 
     struct DeviceSettings {
