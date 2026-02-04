@@ -4,7 +4,9 @@
 #include "ofxMidi.h"
 
 #include <deque>
+#include <string>
 #include <vector>
+#include <iosfwd>
 
 class MidiControl : public ofxMidiListener {
 public:
@@ -59,6 +61,13 @@ private:
         bool padHit = false;
     };
 
+    struct DeviceSettings {
+        std::string name;
+        Binding kaleido;
+        Binding halftone;
+        Binding saturation;
+    };
+
     struct LearnState {
         bool active = false;
         bool windowStarted = false;
@@ -78,6 +87,16 @@ private:
     void openPort(int index);
     void logPorts();
     void sendRandomTestMessage(uint64_t nowMs);
+    bool loadSettings();
+    void saveSettings();
+    bool applySettingsForAvailableDevice();
+    int findInPortByName(const std::string &name);
+    Binding *bindingForTarget(DeviceSettings &device, const std::string &target);
+    DeviceSettings buildCurrentDeviceSettings();
+    void writeBinding(std::ostream &out,
+                      const std::string &target,
+                      const PadBinding &pad,
+                      const KnobBinding &knob) const;
 
     static constexpr uint64_t kLearnWindowMs = 150;
 
@@ -95,6 +114,8 @@ private:
     bool outputTestActive = false;
     uint64_t lastOutputMs = 0;
     uint64_t outputIntervalMs = 120;
+    std::string settingsPath;
+    std::vector<DeviceSettings> savedDevices;
 
     LearnState learn;
     Binding kaleidoBinding;

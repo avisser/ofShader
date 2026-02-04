@@ -54,3 +54,4 @@
 - Learn saturation: press `Shift+V`, then move a knob (CC flood) or hit a pad (NoteOn).
 - Saturation pad: cycles the 4 presets plus off.
 - Saturation knob: sets saturation continuously (0 = B/W, 1 = full color).
+- Settings are persisted to `bin/data/settings.yaml` and loaded on startup. The device name is matched against available MIDI ports; a warning is logged if no match is found.
