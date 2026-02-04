@@ -115,6 +115,10 @@ private:
     bool outputTestActive = false;
     uint64_t lastOutputMs = 0;
     uint64_t outputIntervalMs = 120;
+    int outputTestChannel = 3;
+    int outputTestControl = 0;
+    int outputTestValue = 0;
+    int outputTestControlMax = 31;
     std::string settingsPath;
     std::vector<DeviceSettings> savedDevices;
 

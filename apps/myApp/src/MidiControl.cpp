@@ -169,7 +169,8 @@ void MidiControl::toggleOutputTest() {
     outputTestActive = !outputTestActive;
     lastOutputMs = 0;
     pendingNoteOffs.clear();
-    ofLogNotice() << "MIDI test output: " << (outputTestActive ? "on" : "off");
+    ofLogNotice() << "MIDI test output: " << (outputTestActive ? "on" : "off")
+                  << " (channel " << outputTestChannel << ")";
 }
 
 void MidiControl::processMessage(const ofxMidiMessage &message) {
@@ -354,21 +355,19 @@ void MidiControl::sendRandomTestMessage(uint64_t nowMs) {
     }
     lastOutputMs = nowMs;
 
-    int channel = 1;
-    if (kaleidoBinding.pad.valid()) {
-        channel = kaleidoBinding.pad.channel;
-    } else if (kaleidoBinding.knob.valid()) {
-        channel = kaleidoBinding.knob.channel;
-    }
-
-    int note = 36 + static_cast<int>(ofRandom(0, 16));
-    int velocity = 30 + static_cast<int>(ofRandom(0, 97));
-    midiOut.sendNoteOn(channel, note, velocity);
-    pendingNoteOffs.push_back({channel, note, nowMs + 120});
-
-    int control = 1 + static_cast<int>(ofRandom(0, 32));
-    int value = static_cast<int>(ofRandom(0, 128));
+    int channel = outputTestChannel;
+    int control = outputTestControl;
+    int value = outputTestValue;
     midiOut.sendControlChange(channel, control, value);
+
+    outputTestControl += 1;
+    if (outputTestControl > outputTestControlMax) {
+        outputTestControl = 0;
+        outputTestValue += 16;
+        if (outputTestValue > 127) {
+            outputTestValue = 0;
+        }
+    }
 }
 
 bool MidiControl::loadSettings() {
