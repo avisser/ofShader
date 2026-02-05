@@ -72,8 +72,21 @@ void MidiControl::beginLearn(const std::string &id) {
     registerControl(id);
     learn = LearnState{};
     learn.active = true;
+    learn.mode = LearnState::Mode::Auto;
     learn.targetId = id;
     ofLogNotice() << "MIDI learn (" << id << "): waiting for pad or knob input.";
+}
+
+void MidiControl::beginLearnMute(const std::string &id) {
+    if (id.empty()) {
+        return;
+    }
+    registerControl(id);
+    learn = LearnState{};
+    learn.active = true;
+    learn.mode = LearnState::Mode::PadOnlyMute;
+    learn.targetId = id;
+    ofLogNotice() << "MIDI learn (" << id << "): waiting for mute pad input.";
 }
 
 bool MidiControl::consumePadHit(const std::string &id) {
@@ -101,6 +114,14 @@ bool MidiControl::consumeKnobValue(const std::string &id, float &outValue01) {
     return true;
 }
 
+bool MidiControl::isMuteActive(const std::string &id) const {
+    auto it = bindings.find(id);
+    if (it == bindings.end()) {
+        return false;
+    }
+    return it->second.muteActive;
+}
+
 void MidiControl::cyclePort() {
     int numPorts = midiIn.getNumInPorts();
     if (numPorts <= 0) {
@@ -126,13 +147,33 @@ void MidiControl::processMessage(const ofxMidiMessage &message) {
         return;
     }
 
-    if (message.status == MIDI_NOTE_ON && message.velocity > 0) {
+    bool isNoteOn = (message.status == MIDI_NOTE_ON && message.velocity > 0);
+    bool isNoteOff = (message.status == MIDI_NOTE_OFF) ||
+                     (message.status == MIDI_NOTE_ON && message.velocity == 0);
+
+    if (isNoteOn) {
         for (auto &entry : bindings) {
             auto &binding = entry.second;
             if (binding.pad.valid() &&
                 message.channel == binding.pad.channel &&
                 message.pitch == binding.pad.note) {
                 binding.padHit = true;
+            }
+            if (binding.mutePad.valid() &&
+                message.channel == binding.mutePad.channel &&
+                message.pitch == binding.mutePad.note) {
+                binding.muteActive = true;
+            }
+        }
+    }
+
+    if (isNoteOff) {
+        for (auto &entry : bindings) {
+            auto &binding = entry.second;
+            if (binding.mutePad.valid() &&
+                message.channel == binding.mutePad.channel &&
+                message.pitch == binding.mutePad.note) {
+                binding.muteActive = false;
             }
         }
     }
@@ -159,6 +200,15 @@ void MidiControl::processLearning(const ofxMidiMessage &message) {
         learn.startMs = ofGetElapsedTimeMillis();
     }
 
+    if (learn.mode == LearnState::Mode::PadOnlyMute) {
+        if (message.status == MIDI_NOTE_ON && message.velocity > 0) {
+            learn.noteCount += 1;
+            learn.lastNote = message.pitch;
+            learn.lastNoteChannel = message.channel;
+        }
+        return;
+    }
+
     if (message.status == MIDI_NOTE_ON && message.velocity > 0) {
         learn.noteCount += 1;
         learn.lastNote = message.pitch;
@@ -179,6 +229,21 @@ void MidiControl::finalizeLearning() {
     }
 
     Binding &binding = bindings[learn.targetId];
+
+    if (learn.mode == LearnState::Mode::PadOnlyMute) {
+        if (learn.noteCount >= 1 && learn.lastNote >= 0) {
+            binding.mutePad.channel = learn.lastNoteChannel;
+            binding.mutePad.note = learn.lastNote;
+            ofLogNotice() << "MIDI learn (" << learn.targetId << "): bound mute pad note "
+                          << binding.mutePad.note << " on channel " << binding.mutePad.channel;
+        } else {
+            ofLogWarning() << "MIDI learn (" << learn.targetId << "): no valid mute pad input detected.";
+        }
+        learn.active = false;
+        learn.windowStarted = false;
+        saveSettings();
+        return;
+    }
 
     if (learn.ccCount >= 5 && learn.lastCc >= 0) {
         binding.knob.channel = learn.lastCcChannel;
@@ -377,6 +442,8 @@ bool MidiControl::loadSettings() {
             }
             if (currentType == "pad") {
                 binding.pad.channel = channel;
+            } else if (currentType == "mute") {
+                binding.mutePad.channel = channel;
             } else if (currentType == "knob") {
                 binding.knob.channel = channel;
             }
@@ -392,6 +459,8 @@ bool MidiControl::loadSettings() {
             }
             if (currentType == "pad") {
                 binding.pad.note = note;
+            } else if (currentType == "mute") {
+                binding.mutePad.note = note;
             }
             continue;
         }
@@ -448,7 +517,7 @@ void MidiControl::saveSettings() {
                 continue;
             }
             const auto &binding = it->second;
-            writeBinding(out, key, binding.pad, binding.knob);
+            writeBinding(out, key, binding.pad, binding.mutePad, binding.knob);
         }
     }
 
@@ -517,8 +586,9 @@ MidiControl::DeviceSettings MidiControl::buildCurrentDeviceSettings() {
         Binding clean = binding;
         clean.padHit = false;
         clean.knobUpdated = false;
+        clean.muteActive = false;
         clean.knob.value01 = 0.0f;
-        if (clean.pad.valid() || clean.knob.valid()) {
+        if (clean.pad.valid() || clean.mutePad.valid() || clean.knob.valid()) {
             device.bindings[id] = clean;
         }
     }
@@ -528,12 +598,19 @@ MidiControl::DeviceSettings MidiControl::buildCurrentDeviceSettings() {
 void MidiControl::writeBinding(std::ostream &out,
                                const std::string &target,
                                const PadBinding &pad,
+                               const PadBinding &mute,
                                const KnobBinding &knob) const {
     if (pad.valid()) {
         out << "      - control: " << target << "\n";
         out << "        type: pad\n";
         out << "        channel: " << pad.channel << "\n";
         out << "        note: " << pad.note << "\n";
+    }
+    if (mute.valid()) {
+        out << "      - control: " << target << "\n";
+        out << "        type: mute\n";
+        out << "        channel: " << mute.channel << "\n";
+        out << "        note: " << mute.note << "\n";
     }
     if (knob.valid()) {
         out << "      - control: " << target << "\n";

@@ -228,6 +228,10 @@ void ofApp::keyPressed(int key) {
     }
 }
 
+void ofApp::keyReleased(int key) {
+    (void)key;
+}
+
 void ofApp::exit() {
     if (grabber.isInitialized()) {
         grabber.close();
@@ -489,6 +493,38 @@ void ofApp::handleMidiControls() {
     bool changed = false;
     float value01 = 0.0f;
     for (auto &control : controls) {
+        bool muteActive = midi.isMuteActive(control.id);
+        if (muteActive) {
+            bool startedMute = false;
+            if (!control.muteHeld) {
+                control.muteHeld = true;
+                control.preMuteValue = control.value;
+                control.preMuteEnabled = control.enabled;
+                startedMute = true;
+            }
+            float minVal = std::min(control.knobMin, control.knobMax);
+            control.value = minVal;
+            if (control.id == "saturation") {
+                control.enabled = true;
+            } else if (control.hasOff) {
+                control.enabled = control.value > 0.5f;
+            } else {
+                control.enabled = true;
+            }
+            applyControl(control);
+            if (startedMute) {
+                changed = true;
+            }
+            continue;
+        }
+
+        if (control.muteHeld) {
+            control.muteHeld = false;
+            control.value = control.preMuteValue;
+            control.enabled = control.preMuteEnabled;
+            changed = true;
+        }
+
         if (midi.consumePadHit(control.id)) {
             cycleControlPreset(control);
             changed = true;
@@ -514,8 +550,14 @@ void ofApp::handleMidiControls() {
 }
 
 bool ofApp::handleControlKey(int key) {
+    bool shiftDown = ofGetKeyPressed(OF_KEY_SHIFT);
+    bool cmdDown = ofGetKeyPressed(OF_KEY_COMMAND);
     for (auto &control : controls) {
-        if (key == control.learnKey || (key == control.key && ofGetKeyPressed(OF_KEY_SHIFT))) {
+        if (cmdDown && shiftDown && (key == control.key || key == control.learnKey)) {
+            midi.beginLearnMute(control.id);
+            return true;
+        }
+        if (shiftDown && (key == control.key || key == control.learnKey)) {
             midi.beginLearn(control.id);
             return true;
         }

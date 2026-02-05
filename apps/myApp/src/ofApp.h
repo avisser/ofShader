@@ -26,6 +26,7 @@ public:
     void update() override;
     void draw() override;
     void keyPressed(int key) override;
+    void keyReleased(int key) override;
     void exit() override;
 
 private:
@@ -55,6 +56,9 @@ private:
         int presetIndex = 0;
         float value = 0.0f;
         bool enabled = true;
+        bool muteHeld = false;
+        float preMuteValue = 0.0f;
+        bool preMuteEnabled = true;
     };
 
     ControlSpec *findControlByKey(char key);

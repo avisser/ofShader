@@ -19,8 +19,10 @@ public:
 
     void registerControl(const std::string &id);
     void beginLearn(const std::string &id);
+    void beginLearnMute(const std::string &id);
     bool consumePadHit(const std::string &id);
     bool consumeKnobValue(const std::string &id, float &outValue01);
+    bool isMuteActive(const std::string &id) const;
 
     void newMidiMessage(ofxMidiMessage &message) override;
 
@@ -40,9 +42,11 @@ private:
 
     struct Binding {
         PadBinding pad;
+        PadBinding mutePad;
         KnobBinding knob;
         bool padHit = false;
         bool knobUpdated = false;
+        bool muteActive = false;
     };
 
     struct DeviceSettings {
@@ -51,6 +55,10 @@ private:
     };
 
     struct LearnState {
+        enum class Mode {
+            Auto,
+            PadOnlyMute
+        };
         bool active = false;
         bool windowStarted = false;
         uint64_t startMs = 0;
@@ -61,6 +69,7 @@ private:
         int lastCc = -1;
         int lastCcChannel = -1;
         std::string targetId;
+        Mode mode = Mode::Auto;
     };
 
     void processMessage(const ofxMidiMessage &message);
@@ -77,6 +86,7 @@ private:
     void writeBinding(std::ostream &out,
                       const std::string &target,
                       const PadBinding &pad,
+                      const PadBinding &mute,
                       const KnobBinding &knob) const;
 
     static constexpr uint64_t kLearnWindowMs = 150;
