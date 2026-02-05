@@ -18,21 +18,27 @@
 - `k` Cycle kaleidoscope modes (off → 4 → 6 → 8 → 10 → 12 → off).
 - `Shift+K` Enter MIDI learn mode for kaleidoscope (first pad/knob binds).
 - `Cmd+Shift+K` Enter MIDI learn for a kaleidoscope mute pad (pad-only, hold to mute).
+- `Cmd+Opt+K` or `Ctrl+Shift+Cmd+K` or `Ctrl+Shift+Opt+K` Enter MIDI learn for kaleidoscope oscillator (pad toggles, knob sets speed).
 - `z` Cycle kaleidoscope zoom (0.9 → 0.7 → 0.5).
 - `Shift+Z` Enter MIDI learn mode for kaleidoscope zoom (first pad/knob binds).
 - `Cmd+Shift+Z` Enter MIDI learn for a kaleidoscope zoom mute pad (pad-only, hold to mute).
+- `Cmd+Opt+Z` or `Ctrl+Shift+Cmd+Z` or `Ctrl+Shift+Opt+Z` Enter MIDI learn for kaleidoscope zoom oscillator (pad toggles, knob sets speed).
 - `d` Cycle halftone dots (off → fine → medium → coarse → off).
 - `Shift+D` Enter MIDI learn mode for halftone (first pad/knob binds).
 - `Cmd+Shift+D` Enter MIDI learn for a halftone mute pad (pad-only, hold to mute).
+- `Cmd+Opt+D` or `Ctrl+Shift+Cmd+D` or `Ctrl+Shift+Opt+D` Enter MIDI learn for halftone oscillator (pad toggles, knob sets speed).
 - `v` Cycle saturation presets (off → 0.2 → 0.45 → 0.7 → 0.9 → off).
 - `Shift+V` Enter MIDI learn mode for saturation (first pad/knob binds).
 - `Cmd+Shift+V` Enter MIDI learn for a saturation mute pad (pad-only, hold to mute).
+- `Cmd+Opt+V` or `Ctrl+Shift+Cmd+V` or `Ctrl+Shift+Opt+V` Enter MIDI learn for saturation oscillator (pad toggles, knob sets speed).
 - `t` Cycle tempo (60 → 80 → 100 → 120).
 - `Shift+T` Enter MIDI learn mode for tempo (first pad/knob binds).
 - `Cmd+Shift+T` Enter MIDI learn for a tempo mute pad (pad-only, hold to mute).
+- `Cmd+Opt+T` or `Ctrl+Shift+Cmd+T` or `Ctrl+Shift+Opt+T` Enter MIDI learn for tempo oscillator (pad toggles, knob sets speed).
 - `w` Cycle wet mix presets (0.2 → 0.4 → 0.6 → 0.8).
 - `Shift+W` Enter MIDI learn mode for wet mix (first pad/knob binds).
 - `Cmd+Shift+W` Enter MIDI learn for a wet mix mute pad (pad-only, hold to mute).
+- `Cmd+Opt+W` or `Ctrl+Shift+Cmd+W` or `Ctrl+Shift+Opt+W` Enter MIDI learn for wet mix oscillator (pad toggles, knob sets speed).
 - `c` Toggle paint trail.
 - `b` Cycle woofer distortion (off → on → on → off).
 - `p` Cycle MIDI input ports.
@@ -61,6 +67,7 @@
 - Uses `ofxMidi` for input.
 - Learn: press `Shift+K`, then move a knob (CC flood) or hit a pad (NoteOn).
 - Mute learn: press `Cmd+Shift+K`, then hit a pad. While that pad is held, the control is forced to the minimum knob value; releasing restores the previous value.
+- Oscillator learn: press `Cmd+Opt+K` (or `Ctrl+Shift+Cmd+K` / `Ctrl+Shift+Opt+K`), then hit a pad or move a knob. The pad toggles the oscillator on/off. The knob sets the speed: 0 = off, 1 = 4 measures, 127 = quarter‑note cycles.
 - Pad binding: cycles kaleidoscope modes.
 - Knob binding: sets `kaleidoSegments` continuously (0..16), overriding the cycle.
 - Learn kaleido zoom: press `Shift+Z`, then move a knob (CC flood) or hit a pad (NoteOn).

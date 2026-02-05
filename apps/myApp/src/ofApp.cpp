@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cmath>
 
 namespace {
@@ -159,12 +160,30 @@ void ofApp::draw() {
     }
 }
 
-void ofApp::keyPressed(int key) {
-    static const std::array<int, 3> kWooferModes = {0, 1, 1};
-    if (handleControlKey(key)) {
+void ofApp::keyPressed(ofKeyEventArgs &event) {
+    int actionKey = event.key;
+    int controlKey = actionKey;
+    if (controlKey < 32 || controlKey > 126) {
+        if (event.keycode >= 32 && event.keycode <= 126) {
+            controlKey = event.keycode;
+        }
+    }
+
+    bool shiftDown = event.hasModifier(OF_KEY_SHIFT);
+    bool cmdDown = event.hasModifier(OF_KEY_COMMAND);
+    bool altDown = event.hasModifier(OF_KEY_ALT);
+    bool ctrlDown = event.hasModifier(OF_KEY_CONTROL);
+
+    if (handleControlKey(controlKey, shiftDown, cmdDown, altDown, ctrlDown)) {
         printSettings();
         return;
     }
+
+    keyPressed(actionKey);
+}
+
+void ofApp::keyPressed(int key) {
+    static const std::array<int, 3> kWooferModes = {0, 1, 1};
     if (key == 'f') {
         ofToggleFullscreen();
     } else if (key == 'r') {
@@ -525,6 +544,15 @@ void ofApp::handleMidiControls() {
             changed = true;
         }
 
+        if (midi.consumeOscPadHit(control.id)) {
+            control.oscEnabled = !control.oscEnabled;
+            changed = true;
+        }
+        if (midi.consumeOscKnobValue(control.id, value01)) {
+            control.oscSpeed01 = ofClamp(value01, 0.0f, 1.0f);
+            changed = true;
+        }
+
         if (midi.consumePadHit(control.id)) {
             cycleControlPreset(control);
             changed = true;
@@ -549,10 +577,47 @@ void ofApp::handleMidiControls() {
     }
 }
 
-bool ofApp::handleControlKey(int key) {
-    bool shiftDown = ofGetKeyPressed(OF_KEY_SHIFT);
-    bool cmdDown = ofGetKeyPressed(OF_KEY_COMMAND);
+bool ofApp::handleControlKey(int key,
+                             bool shiftDown,
+                             bool cmdDown,
+                             bool altDown,
+                             bool ctrlDown) {
+    {
+        std::string label;
+        if (cmdDown) {
+            label += "Cmd+";
+        }
+        if (altDown) {
+            label += "Opt+";
+        }
+        if (ctrlDown) {
+            label += "Ctrl+";
+        }
+        if (shiftDown) {
+            label += "Shift+";
+        }
+        std::string keyName;
+        if (key >= 32 && key <= 126) {
+            char c = static_cast<char>(key);
+            if (std::isalpha(static_cast<unsigned char>(c))) {
+                c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+            }
+            keyName.assign(1, c);
+        } else {
+            keyName = "Key(" + ofToString(key) + ")";
+        }
+        ofLogNotice() << "Key debug: " << label << keyName;
+    }
     for (auto &control : controls) {
+        if (cmdDown && altDown && (key == control.key || key == control.learnKey)) {
+            midi.beginLearnOsc(control.id);
+            return true;
+        }
+        if (ctrlDown && shiftDown && (cmdDown || altDown) &&
+            (key == control.key || key == control.learnKey)) {
+            midi.beginLearnOsc(control.id);
+            return true;
+        }
         if (cmdDown && shiftDown && (key == control.key || key == control.learnKey)) {
             midi.beginLearnMute(control.id);
             return true;
@@ -611,33 +676,61 @@ void ofApp::cycleControlPreset(ControlSpec &control) {
 }
 
 void ofApp::applyControl(const ControlSpec &control) {
+    float value = resolveControlValue(control);
     if (control.id == "kaleido") {
-        kaleidoSegments = control.value;
+        kaleidoSegments = value;
         enableKaleido = control.enabled;
         return;
     }
     if (control.id == "kaleidoZoom") {
-        kaleidoZoom = control.value;
+        kaleidoZoom = value;
         return;
     }
     if (control.id == "halftone") {
-        halftoneScale = control.value;
+        halftoneScale = value;
         enableHalftone = control.enabled;
         return;
     }
     if (control.id == "tempo") {
-        pulseBpm = control.value;
+        pulseBpm = value;
         return;
     }
     if (control.id == "saturation") {
-        saturationScale = control.value;
+        saturationScale = value;
         enableSaturation = control.enabled;
         return;
     }
     if (control.id == "wetMix") {
-        wetMix = control.value;
+        wetMix = value;
         return;
     }
+}
+
+float ofApp::resolveControlValue(const ControlSpec &control) const {
+    if (!control.oscEnabled) {
+        return control.value;
+    }
+
+    float bpm = pulseBpm;
+    if (bpm <= 0.0f) {
+        return control.value;
+    }
+
+    float midiValue = control.oscSpeed01 * 127.0f;
+    if (midiValue < 1.0f) {
+        return control.value;
+    }
+
+    float t = ofClamp((midiValue - 1.0f) / 126.0f, 0.0f, 1.0f);
+    float beatsPerCycle = ofLerp(16.0f, 1.0f, t);
+    if (beatsPerCycle <= 0.0f) {
+        return control.value;
+    }
+
+    float beatTime = ofGetElapsedTimef() * (bpm / 60.0f);
+    float phase = std::fmod(beatTime / beatsPerCycle, 1.0f);
+    float lfo = 0.5f - 0.5f * std::cos(phase * TWO_PI);
+    return ofLerp(control.knobMin, control.knobMax, lfo);
 }
 
 void ofApp::updateMotion(const ofPixels &camPixels) {

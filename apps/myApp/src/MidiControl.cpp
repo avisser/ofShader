@@ -89,6 +89,18 @@ void MidiControl::beginLearnMute(const std::string &id) {
     ofLogNotice() << "MIDI learn (" << id << "): waiting for mute pad input.";
 }
 
+void MidiControl::beginLearnOsc(const std::string &id) {
+    if (id.empty()) {
+        return;
+    }
+    registerControl(id);
+    learn = LearnState{};
+    learn.active = true;
+    learn.mode = LearnState::Mode::Osc;
+    learn.targetId = id;
+    ofLogNotice() << "MIDI learn (" << id << "): waiting for oscillator pad or knob input.";
+}
+
 bool MidiControl::consumePadHit(const std::string &id) {
     auto it = bindings.find(id);
     if (it == bindings.end()) {
@@ -111,6 +123,31 @@ bool MidiControl::consumeKnobValue(const std::string &id, float &outValue01) {
     }
     it->second.knobUpdated = false;
     outValue01 = it->second.knob.value01;
+    return true;
+}
+
+bool MidiControl::consumeOscPadHit(const std::string &id) {
+    auto it = bindings.find(id);
+    if (it == bindings.end()) {
+        return false;
+    }
+    if (!it->second.oscPadHit) {
+        return false;
+    }
+    it->second.oscPadHit = false;
+    return true;
+}
+
+bool MidiControl::consumeOscKnobValue(const std::string &id, float &outValue01) {
+    auto it = bindings.find(id);
+    if (it == bindings.end()) {
+        return false;
+    }
+    if (!it->second.oscKnobUpdated) {
+        return false;
+    }
+    it->second.oscKnobUpdated = false;
+    outValue01 = it->second.oscKnob.value01;
     return true;
 }
 
@@ -164,6 +201,11 @@ void MidiControl::processMessage(const ofxMidiMessage &message) {
                 message.pitch == binding.mutePad.note) {
                 binding.muteActive = true;
             }
+            if (binding.oscPad.valid() &&
+                message.channel == binding.oscPad.channel &&
+                message.pitch == binding.oscPad.note) {
+                binding.oscPadHit = true;
+            }
         }
     }
 
@@ -190,6 +232,15 @@ void MidiControl::processMessage(const ofxMidiMessage &message) {
                     binding.knobUpdated = true;
                 }
             }
+            if (binding.oscKnob.valid() &&
+                message.channel == binding.oscKnob.channel &&
+                message.control == binding.oscKnob.control) {
+                float value01 = ofClamp(message.value / 127.0f, 0.0f, 1.0f);
+                if (std::abs(value01 - binding.oscKnob.value01) > 0.0005f) {
+                    binding.oscKnob.value01 = value01;
+                    binding.oscKnobUpdated = true;
+                }
+            }
         }
     }
 }
@@ -205,6 +256,19 @@ void MidiControl::processLearning(const ofxMidiMessage &message) {
             learn.noteCount += 1;
             learn.lastNote = message.pitch;
             learn.lastNoteChannel = message.channel;
+        }
+        return;
+    }
+
+    if (learn.mode == LearnState::Mode::Osc) {
+        if (message.status == MIDI_NOTE_ON && message.velocity > 0) {
+            learn.noteCount += 1;
+            learn.lastNote = message.pitch;
+            learn.lastNoteChannel = message.channel;
+        } else if (message.status == MIDI_CONTROL_CHANGE) {
+            learn.ccCount += 1;
+            learn.lastCc = message.control;
+            learn.lastCcChannel = message.channel;
         }
         return;
     }
@@ -239,6 +303,28 @@ void MidiControl::finalizeLearning() {
         } else {
             ofLogWarning() << "MIDI learn (" << learn.targetId << "): no valid mute pad input detected.";
         }
+        learn.active = false;
+        learn.windowStarted = false;
+        saveSettings();
+        return;
+    }
+
+    if (learn.mode == LearnState::Mode::Osc) {
+        if (learn.ccCount >= 5 && learn.lastCc >= 0) {
+            binding.oscKnob.channel = learn.lastCcChannel;
+            binding.oscKnob.control = learn.lastCc;
+            binding.oscKnob.value01 = 0.0f;
+            ofLogNotice() << "MIDI learn (" << learn.targetId << "): bound osc knob CC "
+                          << binding.oscKnob.control << " on channel " << binding.oscKnob.channel;
+        } else if (learn.noteCount >= 1 && learn.lastNote >= 0) {
+            binding.oscPad.channel = learn.lastNoteChannel;
+            binding.oscPad.note = learn.lastNote;
+            ofLogNotice() << "MIDI learn (" << learn.targetId << "): bound osc pad note "
+                          << binding.oscPad.note << " on channel " << binding.oscPad.channel;
+        } else {
+            ofLogWarning() << "MIDI learn (" << learn.targetId << "): no valid osc input detected.";
+        }
+
         learn.active = false;
         learn.windowStarted = false;
         saveSettings();
@@ -444,8 +530,12 @@ bool MidiControl::loadSettings() {
                 binding.pad.channel = channel;
             } else if (currentType == "mute") {
                 binding.mutePad.channel = channel;
+            } else if (currentType == "osc-pad") {
+                binding.oscPad.channel = channel;
             } else if (currentType == "knob") {
                 binding.knob.channel = channel;
+            } else if (currentType == "osc-knob") {
+                binding.oscKnob.channel = channel;
             }
             continue;
         }
@@ -461,6 +551,8 @@ bool MidiControl::loadSettings() {
                 binding.pad.note = note;
             } else if (currentType == "mute") {
                 binding.mutePad.note = note;
+            } else if (currentType == "osc-pad") {
+                binding.oscPad.note = note;
             }
             continue;
         }
@@ -474,6 +566,8 @@ bool MidiControl::loadSettings() {
             }
             if (currentType == "knob") {
                 binding.knob.control = control;
+            } else if (currentType == "osc-knob") {
+                binding.oscKnob.control = control;
             }
             continue;
         }
@@ -517,7 +611,7 @@ void MidiControl::saveSettings() {
                 continue;
             }
             const auto &binding = it->second;
-            writeBinding(out, key, binding.pad, binding.mutePad, binding.knob);
+            writeBinding(out, key, binding.pad, binding.mutePad, binding.oscPad, binding.oscKnob, binding.knob);
         }
     }
 
@@ -587,8 +681,12 @@ MidiControl::DeviceSettings MidiControl::buildCurrentDeviceSettings() {
         clean.padHit = false;
         clean.knobUpdated = false;
         clean.muteActive = false;
+        clean.oscPadHit = false;
+        clean.oscKnobUpdated = false;
         clean.knob.value01 = 0.0f;
-        if (clean.pad.valid() || clean.mutePad.valid() || clean.knob.valid()) {
+        clean.oscKnob.value01 = 0.0f;
+        if (clean.pad.valid() || clean.mutePad.valid() || clean.oscPad.valid() ||
+            clean.knob.valid() || clean.oscKnob.valid()) {
             device.bindings[id] = clean;
         }
     }
@@ -599,6 +697,8 @@ void MidiControl::writeBinding(std::ostream &out,
                                const std::string &target,
                                const PadBinding &pad,
                                const PadBinding &mute,
+                               const PadBinding &oscPad,
+                               const KnobBinding &oscKnob,
                                const KnobBinding &knob) const {
     if (pad.valid()) {
         out << "      - control: " << target << "\n";
@@ -611,6 +711,18 @@ void MidiControl::writeBinding(std::ostream &out,
         out << "        type: mute\n";
         out << "        channel: " << mute.channel << "\n";
         out << "        note: " << mute.note << "\n";
+    }
+    if (oscPad.valid()) {
+        out << "      - control: " << target << "\n";
+        out << "        type: osc-pad\n";
+        out << "        channel: " << oscPad.channel << "\n";
+        out << "        note: " << oscPad.note << "\n";
+    }
+    if (oscKnob.valid()) {
+        out << "      - control: " << target << "\n";
+        out << "        type: osc-knob\n";
+        out << "        channel: " << oscKnob.channel << "\n";
+        out << "        control: " << oscKnob.control << "\n";
     }
     if (knob.valid()) {
         out << "      - control: " << target << "\n";

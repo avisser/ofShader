@@ -26,6 +26,7 @@ public:
     void update() override;
     void draw() override;
     void keyPressed(int key) override;
+    void keyPressed(ofKeyEventArgs &key) override;
     void keyReleased(int key) override;
     void exit() override;
 
@@ -43,7 +44,11 @@ private:
     void setupKeyShader();
     void setupControls();
     void handleMidiControls();
-    bool handleControlKey(int key);
+    bool handleControlKey(int key,
+                          bool shiftDown,
+                          bool cmdDown,
+                          bool altDown,
+                          bool ctrlDown);
 
     struct ControlSpec {
         std::string id;
@@ -59,12 +64,15 @@ private:
         bool muteHeld = false;
         float preMuteValue = 0.0f;
         bool preMuteEnabled = true;
+        bool oscEnabled = false;
+        float oscSpeed01 = 0.0f;
     };
 
     ControlSpec *findControlByKey(char key);
     ControlSpec *findControlById(const std::string &id);
     void cycleControlPreset(ControlSpec &control);
     void applyControl(const ControlSpec &control);
+    float resolveControlValue(const ControlSpec &control) const;
 
     AppConfig config;
 
