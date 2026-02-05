@@ -680,6 +680,20 @@ void ofApp::applyControl(const ControlSpec &control) {
     if (control.id == "kaleido") {
         kaleidoSegments = value;
         enableKaleido = control.enabled;
+        float minVal = std::min(control.knobMin, control.knobMax);
+        float maxVal = std::max(control.knobMin, control.knobMax);
+        float eps = std::max(0.01f, (maxVal - minVal) * 0.01f);
+        int newState = 0;
+        if (value <= minVal + eps) {
+            newState = -1;
+        } else if (value >= maxVal - eps) {
+            newState = 1;
+        }
+        if (newState != 0 && newState != kaleidoExtremeState) {
+            kaleidoSpinFlip = !kaleidoSpinFlip;
+            kaleidoSpin = kaleidoSpinBase * (kaleidoSpinFlip ? -1.0f : 1.0f);
+        }
+        kaleidoExtremeState = newState;
         return;
     }
     if (control.id == "kaleidoZoom") {

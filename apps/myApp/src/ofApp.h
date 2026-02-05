@@ -120,7 +120,10 @@ private:
     int wooferModeIndex = 0;
     bool enableKaleido = true;
     float kaleidoSegments = 6.0f;
-    float kaleidoSpin = 0.0f;
+    float kaleidoSpin = 0.25f;
+    float kaleidoSpinBase = 0.25f;
+    bool kaleidoSpinFlip = false;
+    int kaleidoExtremeState = 0;
     float kaleidoZoom = 0.7f;
     float kaleidoZoomKnobMin = 0.3f;
     float kaleidoZoomKnobMax = 1.0f;
