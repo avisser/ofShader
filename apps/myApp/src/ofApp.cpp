@@ -563,7 +563,10 @@ void ofApp::handleMidiControls() {
             if (control.id == "saturation") {
                 control.enabled = true;
             } else if (control.hasOff) {
-                control.enabled = control.value > 0.5f;
+                float minVal = std::min(control.knobMin, control.knobMax);
+                float maxVal = std::max(control.knobMin, control.knobMax);
+                float eps = std::max(0.01f, (maxVal - minVal) * 0.01f);
+                control.enabled = control.value > minVal + eps;
             } else {
                 control.enabled = true;
             }
