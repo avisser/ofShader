@@ -4,6 +4,8 @@
 - **Input**: Webcam via `ofVideoGrabber` at the configured resolution/FPS.
 - **Update**:
   - Motion analysis (`updateMotion`) computes movement intensity + center and feeds the paint trail.
+  - Vision face detection runs every few frames and caches face bounds.
+  - Vision hand pose detection tracks fingertips for sparkles.
   - If shader mode is **off** (`2`), OpenCV MOG2 builds a background mask (threshold + morph + blur).
 - **Draw**:
   - Background image (`bg.jpg`) or a flat gray fallback.
@@ -11,6 +13,8 @@
     - **Shader mode** (`1`): webcam texture → optional kaleidoscope/halftone → woofer distortion (beat‑synced) → HSV key → posterize + edge boost → optional hue‑pulse → optional saturation → wet/dry mix → alpha output.
     - **BG‑sub mode** (`2`): composited RGBA mask from MOG2.
   - Paint trail overlay (toggle `c`).
+  - Face debug overlay (cyan rectangles).
+  - Hand sparkles (directional sparkler particles from fingertips).
 
 ## Key Bindings
 - `1` Shader key mode (HSV key + stylize).
@@ -62,6 +66,9 @@
 - Hue pulse: `pulseBpm`, `pulseHueShiftDeg`
 - Woofer: `wooferStrength`, `wooferFalloff`
 - Paint trail: `trailFade`, `trailSize`, `trailOpacity`, `motionThreshold`
+- Face detect: `faceDetectScale`, `faceDetectInterval`, `showFaceDebug`
+- Hand detect: `handDetectScale`, `handDetectInterval`, `showHandDebug`, `handSparkleSize`, `handSparkleOpacity`
+- Hand finger selection: `handSparkleFingers` (thumb, index, middle, ring, pinky)
 
 ## MIDI
 - Uses `ofxMidi` for input.

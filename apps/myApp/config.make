@@ -79,6 +79,9 @@ OF_ROOT = /Users/avisser/source/openFrameworks
 # TODO: should this be a default setting?
 # PROJECT_LDFLAGS=-Wl,-rpath=./libs
 
+# macOS Vision/Core ML face detection
+PROJECT_LDFLAGS += -framework Vision -framework CoreML -framework CoreVideo
+
 ################################################################################
 # PROJECT DEFINES
 #   Create a space-delimited list of DEFINES. The list will be converted into 

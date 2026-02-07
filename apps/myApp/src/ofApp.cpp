@@ -27,6 +27,9 @@ void ofApp::setup() {
     setupKeyShader();
     midi.setup();
     setupControls();
+    faceDetector.setup(faceDetectScale);
+    handDetector.setup(handDetectScale);
+    handDetector.setEnabledFingers(handSparkleFingers);
 
     listCameras();
     if (!devices.empty()) {
@@ -78,6 +81,31 @@ void ofApp::update() {
     grabber.update();
     if (grabber.isFrameNew()) {
         updateMotion(grabber.getPixels());
+        if (enableFaceDetect) {
+            faceDetectFrame++;
+            if (faceDetectInterval <= 0 || (faceDetectFrame % faceDetectInterval) == 0) {
+                faceDetector.setScale(faceDetectScale);
+                if (!faceDetector.detect(grabber.getPixels(), faceRects)) {
+                    const std::string &err = faceDetector.getLastError();
+                    if (!err.empty()) {
+                        ofLogWarning() << "Face detect: " << err;
+                    }
+                }
+            }
+        }
+        if (enableHandSparkles) {
+            handDetectFrame++;
+            if (handDetectInterval <= 0 || (handDetectFrame % handDetectInterval) == 0) {
+                handDetector.setScale(handDetectScale);
+                handDetector.setEnabledFingers(handSparkleFingers);
+                if (!handDetector.detect(grabber.getPixels(), handPoints)) {
+                    const std::string &err = handDetector.getLastError();
+                    if (!err.empty()) {
+                        ofLogWarning() << "Hand detect: " << err;
+                    }
+                }
+            }
+        }
         if (!useShaderKey) {
             updateComposite();
         }
@@ -86,7 +114,10 @@ void ofApp::update() {
     midi.update();
     handleMidiControls();
 
-    updateTrail(ofGetLastFrameTime());
+    float dt = ofGetLastFrameTime();
+    emitHandSparks(dt);
+    updateSparkParticles(dt);
+    updateTrail(dt);
 }
 
 void ofApp::draw() {
@@ -140,8 +171,40 @@ void ofApp::draw() {
         drawTextureCover(rgbaTexture, ofGetWidth(), ofGetHeight(), true);
     }
 
-    if (enableTrail) {
+    if (enableTrail || enableHandSparkles) {
         drawTrail();
+    }
+
+    if (showFaceDebug && !faceRects.empty() && grabber.isInitialized()) {
+        ofPushStyle();
+        ofNoFill();
+        ofSetColor(0, 255, 255);
+        ofSetLineWidth(2.0f);
+        float camW = grabber.getWidth();
+        float camH = grabber.getHeight();
+        for (const auto &rect : faceRects) {
+            ofVec2f tl = mapCameraToScreen({rect.x, rect.y}, camW, camH, true);
+            ofVec2f br = mapCameraToScreen({rect.x + rect.width, rect.y + rect.height}, camW, camH, true);
+            float x = std::min(tl.x, br.x);
+            float y = std::min(tl.y, br.y);
+            float w = std::abs(br.x - tl.x);
+            float h = std::abs(br.y - tl.y);
+            ofDrawRectangle(x, y, w, h);
+        }
+        ofPopStyle();
+    }
+
+    if (showHandDebug && !handPoints.empty() && grabber.isInitialized()) {
+        ofPushStyle();
+        ofSetColor(255, 0, 255);
+        ofFill();
+        float camW = grabber.getWidth();
+        float camH = grabber.getHeight();
+        for (const auto &pt : handPoints) {
+            ofVec2f pos = mapCameraToScreen(pt.tip, camW, camH, true);
+            ofDrawCircle(pos, 6.0f);
+        }
+        ofPopStyle();
     }
 
     float beatsPerSecond = pulseBpm / 60.0f;
@@ -822,7 +885,7 @@ void ofApp::updateMotion(const ofPixels &camPixels) {
 }
 
 void ofApp::updateTrail(float dt) {
-    if (!enableTrail) {
+    if (!enableTrail && !enableHandSparkles) {
         return;
     }
 
@@ -847,27 +910,121 @@ void ofApp::updateTrail(float dt) {
     ofSetColor(0, 0, 0, static_cast<int>(trailFade * 255.0f));
     ofDrawRectangle(0, 0, width, height);
 
-    if (motionLevel > motionThreshold && motionCamW > 0.0f && motionCamH > 0.0f) {
-        float intensity = ofClamp((motionLevel - motionThreshold) * 12.0f, 0.0f, 1.0f);
-        ofVec2f pos = mapCameraToScreen(motionCenter, motionCamW, motionCamH, true);
-        ofFloatColor c = motionColor;
-        c.a = trailOpacity * intensity;
-        ofEnableBlendMode(OF_BLENDMODE_ADD);
-        ofSetColor(c);
-        float radius = trailSize * (0.7f + 1.4f * intensity);
-        if (hasTrailPos) {
-            ofSetLineWidth(std::max(1.0f, radius * 0.35f));
-            ofDrawLine(lastTrailPos, pos);
+    if (enableTrail) {
+        if (motionLevel > motionThreshold && motionCamW > 0.0f && motionCamH > 0.0f) {
+            float intensity = ofClamp((motionLevel - motionThreshold) * 12.0f, 0.0f, 1.0f);
+            ofVec2f pos = mapCameraToScreen(motionCenter, motionCamW, motionCamH, true);
+            ofFloatColor c = motionColor;
+            c.a = trailOpacity * intensity;
+            ofEnableBlendMode(OF_BLENDMODE_ADD);
+            ofSetColor(c);
+            float radius = trailSize * (0.7f + 1.4f * intensity);
+            if (hasTrailPos) {
+                ofSetLineWidth(std::max(1.0f, radius * 0.35f));
+                ofDrawLine(lastTrailPos, pos);
+            }
+            ofDrawCircle(pos, radius);
+            lastTrailPos = pos;
+            hasTrailPos = true;
+        } else {
+            hasTrailPos = false;
         }
-        ofDrawCircle(pos, radius);
-        lastTrailPos = pos;
-        hasTrailPos = true;
-    } else {
-        hasTrailPos = false;
+    }
+
+    if (enableHandSparkles && !sparkParticles.empty()) {
+        ofEnableBlendMode(OF_BLENDMODE_ADD);
+        for (const auto &particle : sparkParticles) {
+            float t = ofClamp(1.0f - (particle.age / particle.life), 0.0f, 1.0f);
+            float alpha = t * t * handSparkleOpacity;
+            ofFloatColor c = particle.color;
+            c.a = alpha;
+            ofSetColor(c);
+            float size = particle.size * (0.5f + 0.5f * t);
+            ofDrawCircle(particle.pos, size);
+            ofSetLineWidth(std::max(1.0f, size * 0.4f));
+            ofDrawLine(particle.prev, particle.pos);
+        }
     }
 
     ofPopStyle();
     trailFbo.end();
+}
+
+void ofApp::emitHandSparks(float dt) {
+    if (!enableHandSparkles || handPoints.empty() || !grabber.isInitialized()) {
+        return;
+    }
+
+    float camW = grabber.getWidth();
+    float camH = grabber.getHeight();
+    float sizeScale = handSparkleSize / 18.0f;
+
+    for (const auto &hand : handPoints) {
+        ofVec2f tipScreen = mapCameraToScreen(hand.tip, camW, camH, true);
+        ofVec2f baseScreen = mapCameraToScreen(hand.tip - hand.dir, camW, camH, true);
+        ofVec2f dir = tipScreen - baseScreen;
+        if (dir.lengthSquared() < 4.0f) {
+            continue;
+        }
+        dir.normalize();
+
+        float emit = sparkEmitRate * dt;
+        int count = static_cast<int>(emit);
+        if (ofRandom(1.0f) < (emit - static_cast<float>(count))) {
+            count += 1;
+        }
+
+        for (int i = 0; i < count; ++i) {
+            if (sparkParticles.size() >= static_cast<size_t>(maxSparkParticles)) {
+                sparkParticles.erase(sparkParticles.begin());
+            }
+
+            float angle = std::atan2(dir.y, dir.x) + ofRandom(-sparkSpread, sparkSpread);
+            float speed = sparkSpeed * ofRandom(0.4f, 1.0f);
+            ofVec2f vel(std::cos(angle), std::sin(angle));
+            vel *= speed;
+            vel += ofVec2f(ofRandom(-sparkJitter, sparkJitter),
+                           ofRandom(-sparkJitter, sparkJitter)) * 0.1f;
+
+            ofFloatColor c = motionColor;
+            c = c.getLerped(ofFloatColor(1.0f, 0.8f, 0.4f), 0.4f);
+            float brightness = ofRandom(0.6f, 1.0f);
+            c.r *= brightness;
+            c.g *= brightness;
+            c.b *= brightness;
+
+            SparkParticle particle;
+            particle.pos = tipScreen;
+            particle.prev = tipScreen;
+            particle.vel = vel;
+            particle.color = c;
+            particle.life = sparkLife * ofRandom(0.6f, 1.2f);
+            particle.size = ofRandom(1.5f, 4.5f) * sizeScale;
+            sparkParticles.push_back(particle);
+        }
+    }
+}
+
+void ofApp::updateSparkParticles(float dt) {
+    if (sparkParticles.empty()) {
+        return;
+    }
+
+    float drag = std::pow(sparkDrag, dt * 60.0f);
+    for (auto &particle : sparkParticles) {
+        particle.prev = particle.pos;
+        particle.age += dt;
+        particle.vel *= drag;
+        particle.vel.y += sparkGravity * dt;
+        particle.pos += particle.vel * dt;
+    }
+
+    sparkParticles.erase(std::remove_if(sparkParticles.begin(),
+                                        sparkParticles.end(),
+                                        [](const SparkParticle &p) {
+                                            return p.age >= p.life;
+                                        }),
+                         sparkParticles.end());
 }
 
 void ofApp::drawTrail() {

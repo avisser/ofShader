@@ -5,10 +5,13 @@
 #include <opencv2/core.hpp>
 #include <opencv2/video/background_segm.hpp>
 
+#include <array>
 #include <string>
 #include <vector>
 
 #include "MidiControl.h"
+#include "VisionFaceDetector.h"
+#include "VisionHandPoseDetector.h"
 
 struct AppConfig {
     std::string bgPath = "bg.jpg";
@@ -73,6 +76,8 @@ private:
     void cycleControlPreset(ControlSpec &control);
     void applyControl(const ControlSpec &control);
     float resolveControlValue(const ControlSpec &control) const;
+    void emitHandSparks(float dt);
+    void updateSparkParticles(float dt);
 
     AppConfig config;
 
@@ -155,4 +160,43 @@ private:
     ofVec2f lastTrailPos = {0.0f, 0.0f};
     bool hasTrailPos = false;
     cv::Mat prevGray;
+
+    VisionFaceDetector faceDetector;
+    std::vector<ofRectangle> faceRects;
+    bool enableFaceDetect = true;
+    bool showFaceDebug = true;
+    int faceDetectFrame = 0;
+    int faceDetectInterval = 3;
+    float faceDetectScale = 0.5f;
+
+    struct SparkParticle {
+        ofVec2f pos;
+        ofVec2f prev;
+        ofVec2f vel;
+        ofFloatColor color;
+        float age = 0.0f;
+        float life = 1.0f;
+        float size = 2.0f;
+    };
+
+    VisionHandPoseDetector handDetector;
+    std::vector<VisionHandPoseDetector::HandPoint> handPoints;
+    std::vector<SparkParticle> sparkParticles;
+    bool enableHandSparkles = true;
+    bool showHandDebug = false;
+    int handDetectFrame = 0;
+    int handDetectInterval = 2;
+    float handDetectScale = 0.5f;
+    float handSparkleSize = 18.0f;
+    float handSparkleOpacity = 0.85f;
+    std::array<bool, 5> handSparkleFingers = {false, true, true, false, false};
+    
+    float sparkEmitRate = 140.0f;
+    float sparkSpeed = 2400.0f;
+    float sparkSpread = 0.45f;
+    float sparkLife = 1.4f;
+    float sparkDrag = 0.93f;
+    float sparkGravity = 220.0f;
+    float sparkJitter = 40.0f;
+    int maxSparkParticles = 2400;
 };

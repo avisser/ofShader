@@ -1,0 +1,4 @@
+// Local overrides for Xcode builds.
+// Keeps custom framework links out of Project.xcconfig so regen won't clobber them.
+OF_CORE_FRAMEWORKS = $(OF_CORE_FRAMEWORKS) -framework Vision -framework CoreML -framework CoreVideo
+OTHER_LDFLAGS = $(inherited) -framework Vision -framework CoreML -framework CoreVideo
