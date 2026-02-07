@@ -3,7 +3,7 @@
 ## Pipeline
 - **Input**: Webcam via `ofVideoGrabber` at the configured resolution/FPS.
 - **Update**:
-  - Motion analysis (`updateMotion`) computes movement intensity + center and feeds the paint trail.
+  - Motion analysis (`updateMotion`) samples a live color for spark particles.
   - Vision face detection runs every few frames and caches face bounds.
   - Vision hand pose detection tracks fingertips for sparkles.
   - If shader mode is **off** (`2`), OpenCV MOG2 builds a background mask (threshold + morph + blur).
@@ -12,7 +12,6 @@
   - Foreground:
     - **Shader mode** (`1`): webcam texture → optional kaleidoscope/halftone → woofer distortion (beat‑synced) → HSV key → posterize + edge boost → optional hue‑pulse → optional saturation → wet/dry mix → alpha output.
     - **BG‑sub mode** (`2`): composited RGBA mask from MOG2.
-  - Paint trail overlay (toggle `c`).
   - Face debug overlay (cyan rectangles).
   - Hand sparkles (directional sparkler particles from fingertips).
 
@@ -43,8 +42,8 @@
 - `Shift+W` Enter MIDI learn mode for wet mix (first pad/knob binds).
 - `Cmd+Shift+W` Enter MIDI learn for a wet mix mute pad (pad-only, hold to mute).
 - `Cmd+Opt+W` or `Ctrl+Shift+Cmd+W` or `Ctrl+Shift+Opt+W` Enter MIDI learn for wet mix oscillator (pad toggles, knob sets speed).
-- `c` Toggle paint trail.
 - `b` Cycle woofer distortion (off → on → on → off).
+- `?` Toggle on-screen help overlay (any key hides it).
 - `p` Cycle MIDI input ports.
 - `o` Toggle MIDI test output (random Note On + CC).
 - `r` Reset background model.
@@ -65,7 +64,7 @@
 - Halftone: `halftoneScale`, `halftoneEdge`
 - Hue pulse: `pulseBpm`, `pulseHueShiftDeg`
 - Woofer: `wooferStrength`, `wooferFalloff`
-- Paint trail: `trailFade`, `trailSize`, `trailOpacity`, `motionThreshold`
+- Spark trails: `trailFade`
 - Face detect: `faceDetectScale`, `faceDetectInterval`, `showFaceDebug`
 - Hand detect: `handDetectScale`, `handDetectInterval`, `showHandDebug`, `handSparkleSize`, `handSparkleOpacity`
 - Hand finger selection: `handSparkleFingers` (thumb, index, middle, ring, pinky)

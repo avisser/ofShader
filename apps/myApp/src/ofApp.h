@@ -52,6 +52,7 @@ private:
                           bool cmdDown,
                           bool altDown,
                           bool ctrlDown);
+    void drawHelpOverlay();
 
     struct ControlSpec {
         std::string id;
@@ -146,19 +147,10 @@ private:
     float beatDotRadius = 10.0f;
     float beatDownbeatRadius = 20.0f;
 
-    bool enableTrail = true;
     ofFbo trailFbo;
     float trailFade = 0.04f;
-    float trailSize = 38.0f;
-    float trailOpacity = 0.8f;
     float motionLevel = 0.0f;
-    ofVec2f motionCenter = {0.0f, 0.0f};
     ofFloatColor motionColor = ofFloatColor(1.0f, 1.0f, 1.0f, 1.0f);
-    float motionThreshold = 0.02f;
-    float motionCamW = 0.0f;
-    float motionCamH = 0.0f;
-    ofVec2f lastTrailPos = {0.0f, 0.0f};
-    bool hasTrailPos = false;
     cv::Mat prevGray;
 
     VisionFaceDetector faceDetector;
@@ -184,6 +176,8 @@ private:
     std::vector<SparkParticle> sparkParticles;
     bool enableHandSparkles = true;
     bool showHandDebug = false;
+    bool showHelpOverlay = false;
+    ofTrueTypeFont helpFont;
     int handDetectFrame = 0;
     int handDetectInterval = 2;
     float handDetectScale = 0.5f;

@@ -29,6 +29,7 @@ void ofApp::setup() {
     setupControls();
     faceDetector.setup(faceDetectScale);
     handDetector.setup(handDetectScale);
+    helpFont.load("Helvetica", 24, true, true);
     handDetector.setEnabledFingers(handSparkleFingers);
 
     listCameras();
@@ -171,8 +172,12 @@ void ofApp::draw() {
         drawTextureCover(rgbaTexture, ofGetWidth(), ofGetHeight(), true);
     }
 
-    if (enableTrail || enableHandSparkles) {
+    if (enableHandSparkles) {
         drawTrail();
+    }
+
+    if (showHelpOverlay) {
+        drawHelpOverlay();
     }
 
     if (showFaceDebug && !faceRects.empty() && grabber.isInitialized()) {
@@ -237,6 +242,15 @@ void ofApp::keyPressed(ofKeyEventArgs &event) {
     bool altDown = event.hasModifier(OF_KEY_ALT);
     bool ctrlDown = event.hasModifier(OF_KEY_CONTROL);
 
+    bool helpKey = (actionKey == '?' || controlKey == '?' || controlKey == '/');
+    if (helpKey) {
+        showHelpOverlay = !showHelpOverlay;
+        return;
+    }
+    if (showHelpOverlay) {
+        showHelpOverlay = false;
+    }
+
     if (handleControlKey(controlKey, shiftDown, cmdDown, altDown, ctrlDown)) {
         printSettings();
         return;
@@ -258,15 +272,6 @@ void ofApp::keyPressed(int key) {
     } else if (key == '2') {
         useShaderKey = false;
         resetBackgroundSubtractor();
-        printSettings();
-    } else if (key == 'c') {
-        enableTrail = !enableTrail;
-        hasTrailPos = false;
-        if (!enableTrail && trailFbo.isAllocated()) {
-            trailFbo.begin();
-            ofClear(0, 0, 0, 0);
-            trailFbo.end();
-        }
         printSettings();
     } else if (key == 'p') {
         midi.cyclePort();
@@ -842,13 +847,10 @@ void ofApp::updateMotion(const ofPixels &camPixels) {
     cv::cvtColor(frame, gray, cv::COLOR_RGB2GRAY);
 
     if (prevGray.empty() || prevGray.size() != gray.size()) {
-        motionCamW = static_cast<float>(gray.cols);
-        motionCamH = static_cast<float>(gray.rows);
         prevGray = gray.clone();
         motionLevel = 0.0f;
-        motionCenter = {gray.cols * 0.5f, gray.rows * 0.5f};
-        int px = ofClamp(static_cast<int>(motionCenter.x), 0, camPixels.getWidth() - 1);
-        int py = ofClamp(static_cast<int>(motionCenter.y), 0, camPixels.getHeight() - 1);
+        int px = camPixels.getWidth() / 2;
+        int py = camPixels.getHeight() / 2;
         ofColor sample = camPixels.getColor(px, py);
         float hue = sample.getHue() / 255.0f;
         float sat = ofClamp((sample.getSaturation() / 255.0f) * 1.2f, 0.6f, 1.0f);
@@ -862,19 +864,8 @@ void ofApp::updateMotion(const ofPixels &camPixels) {
     cv::Scalar meanDiff = cv::mean(diff);
     motionLevel = static_cast<float>(meanDiff[0] / 255.0);
 
-    cv::Mat thresh;
-    cv::threshold(diff, thresh, 25, 255, cv::THRESH_BINARY);
-    cv::Moments m = cv::moments(thresh, true);
-    if (m.m00 > 0.0) {
-        motionCenter = {static_cast<float>(m.m10 / m.m00),
-                        static_cast<float>(m.m01 / m.m00)};
-    }
-
-    motionCamW = static_cast<float>(gray.cols);
-    motionCamH = static_cast<float>(gray.rows);
-
-    int px = ofClamp(static_cast<int>(motionCenter.x), 0, camPixels.getWidth() - 1);
-    int py = ofClamp(static_cast<int>(motionCenter.y), 0, camPixels.getHeight() - 1);
+    int px = camPixels.getWidth() / 2;
+    int py = camPixels.getHeight() / 2;
     ofColor sample = camPixels.getColor(px, py);
     float hue = sample.getHue() / 255.0f;
     float sat = ofClamp((sample.getSaturation() / 255.0f) * 1.2f, 0.6f, 1.0f);
@@ -885,7 +876,7 @@ void ofApp::updateMotion(const ofPixels &camPixels) {
 }
 
 void ofApp::updateTrail(float dt) {
-    if (!enableTrail && !enableHandSparkles) {
+    if (!enableHandSparkles) {
         return;
     }
 
@@ -909,27 +900,6 @@ void ofApp::updateTrail(float dt) {
     ofEnableBlendMode(OF_BLENDMODE_ALPHA);
     ofSetColor(0, 0, 0, static_cast<int>(trailFade * 255.0f));
     ofDrawRectangle(0, 0, width, height);
-
-    if (enableTrail) {
-        if (motionLevel > motionThreshold && motionCamW > 0.0f && motionCamH > 0.0f) {
-            float intensity = ofClamp((motionLevel - motionThreshold) * 12.0f, 0.0f, 1.0f);
-            ofVec2f pos = mapCameraToScreen(motionCenter, motionCamW, motionCamH, true);
-            ofFloatColor c = motionColor;
-            c.a = trailOpacity * intensity;
-            ofEnableBlendMode(OF_BLENDMODE_ADD);
-            ofSetColor(c);
-            float radius = trailSize * (0.7f + 1.4f * intensity);
-            if (hasTrailPos) {
-                ofSetLineWidth(std::max(1.0f, radius * 0.35f));
-                ofDrawLine(lastTrailPos, pos);
-            }
-            ofDrawCircle(pos, radius);
-            lastTrailPos = pos;
-            hasTrailPos = true;
-        } else {
-            hasTrailPos = false;
-        }
-    }
 
     if (enableHandSparkles && !sparkParticles.empty()) {
         ofEnableBlendMode(OF_BLENDMODE_ADD);
@@ -1086,8 +1056,76 @@ void ofApp::printSettings() {
     ofLogNotice() << "Woofer: " << (enableWoofer ? "on" : "off")
                   << " strength=" << wooferStrength
                   << " falloff=" << wooferFalloff;
-    ofLogNotice() << "Trail: " << (enableTrail ? "on" : "off")
-                  << " fade=" << trailFade
-                  << " size=" << trailSize
+    ofLogNotice() << "Sparkles: " << (enableHandSparkles ? "on" : "off")
+                  << " particles=" << sparkParticles.size()
                   << " motion=" << motionLevel;
+}
+
+void ofApp::drawHelpOverlay() {
+    std::vector<std::string> lines = {
+        "Help / Controls (? to hide)",
+        "",
+        "Modes:",
+        "  1  Shader key mode",
+        "  2  Background subtractor (MOG2)",
+        "",
+        "Effects:",
+        "  k  Kaleidoscope modes",
+        "  z  Kaleido zoom",
+        "  d  Halftone dots",
+        "  v  Saturation",
+        "  t  Tempo",
+        "  w  Wet mix",
+        "  b  Woofer distortion",
+        "",
+        "System:",
+        "  f  Fullscreen",
+        "  r  Reset background model",
+        "  p  Cycle MIDI input ports",
+        "  o  MIDI test output",
+        "  + / -  Mask threshold (bg-sub)",
+        "  e  Morph (bg-sub)",
+        "  s  Shadow detection (bg-sub)",
+        "  [ / ]  Camera prev/next",
+        "  Esc  Quit",
+        "",
+        "MIDI learn:",
+        "  Shift+[key]   learn pad/knob",
+        "  Cmd+Shift+[key]   learn mute pad (hold to min)",
+        "  Cmd+Opt+[key] or Ctrl+Shift+Cmd/Opt+[key]",
+        "    learn oscillator (pad toggles, knob speed)",
+        "",
+        "Vision:",
+        "  Face detect (cyan boxes)",
+        "  Hand sparkles (directional sparks)",
+    };
+
+    float w = ofGetWidth();
+    float h = ofGetHeight();
+    float boxW = w * 0.86f;
+    float boxH = h * 0.86f;
+    float x = (w - boxW) * 0.5f;
+    float y = (h - boxH) * 0.5f;
+    float padding = 32.0f;
+    float lineHeight = 30.0f;
+
+    ofPushStyle();
+    ofSetColor(0, 0, 0, 200);
+    ofDrawRectangle(x, y, boxW, boxH);
+    ofSetColor(255);
+
+    float textX = x + padding;
+    float textY = y + padding + lineHeight;
+    for (const auto &line : lines) {
+        if (helpFont.isLoaded()) {
+            helpFont.drawString(line, textX, textY);
+        } else {
+            ofDrawBitmapString(line, textX, textY);
+        }
+        textY += lineHeight;
+        if (textY > y + boxH - padding) {
+            break;
+        }
+    }
+    ofPopStyle();
 }
